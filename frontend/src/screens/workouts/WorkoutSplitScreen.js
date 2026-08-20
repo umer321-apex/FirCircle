@@ -1,32 +1,35 @@
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
-import theme from '../../constants/theme';
+import { useTheme } from '../../context/ThemeContext';
 
 const SPLITS = [
-  { key: 'Chest Day', emoji: '🏋️', color: '#FF5A3C' },
-  { key: 'Back Day', emoji: '🔙', color: '#00D9A3' },
-  { key: 'Leg Day', emoji: '🦵', color: '#FFB020' },
-  { key: 'Shoulder Day', emoji: '💪', color: '#4D9DFF' },
-  { key: 'Arm Day', emoji: '💥', color: '#C77DFF' },
+  { key: 'Chest Day', emoji: '🏋️' },
+  { key: 'Back Day', emoji: '🔙' },
+  { key: 'Leg Day', emoji: '🦵' },
+  { key: 'Shoulder Day', emoji: '💪' },
+  { key: 'Arm Day', emoji: '💥' },
 ];
 
 export default function WorkoutSplitScreen({ navigation }) {
+  const { theme } = useTheme();
+  const styles = createStyles(theme);
+
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <Text style={styles.title}>Choose your split</Text>
+      <Text style={styles.title}>WORKOUTS</Text>
       <Text style={styles.subtitle}>Pick today's focus area</Text>
 
       <View style={styles.grid}>
         {SPLITS.map((split) => (
           <TouchableOpacity
             key={split.key}
-            style={[styles.card, { borderColor: split.color }]}
+            style={styles.card}
             onPress={() => navigation.navigate('ExerciseList', { split: split.key })}
             activeOpacity={0.85}
           >
-            <View style={[styles.iconCircle, { backgroundColor: split.color }]}>
+            <View style={styles.iconCircle}>
               <Text style={styles.iconEmoji}>{split.emoji}</Text>
             </View>
-            <Text style={styles.cardLabel}>{split.key}</Text>
+            <Text style={styles.cardLabel}>{split.key.toUpperCase()}</Text>
           </TouchableOpacity>
         ))}
       </View>
@@ -34,52 +37,53 @@ export default function WorkoutSplitScreen({ navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: theme.colors.background,
-  },
-  content: {
-    paddingHorizontal: theme.spacing.lg,
-    paddingVertical: theme.spacing.xxl,
-  },
-  title: {
-    fontSize: theme.fontSize.xl,
-    fontWeight: theme.fontWeight.bold,
-    color: theme.colors.text,
-    marginBottom: theme.spacing.xs,
-  },
-  subtitle: {
-    fontSize: theme.fontSize.sm,
-    color: theme.colors.muted,
-    marginBottom: theme.spacing.xl,
-  },
-  grid: {
-    gap: theme.spacing.md,
-  },
-  card: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: theme.colors.surface,
-    borderRadius: theme.radius.lg,
-    borderWidth: 2,
-    padding: theme.spacing.md,
-    ...theme.shadow.card,
-  },
-  iconCircle: {
-    width: 52,
-    height: 52,
-    borderRadius: theme.radius.full,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: theme.spacing.md,
-  },
-  iconEmoji: {
-    fontSize: 26,
-  },
-  cardLabel: {
-    fontSize: theme.fontSize.lg,
-    fontWeight: theme.fontWeight.semibold,
-    color: theme.colors.text,
-  },
-});
+const createStyles = (theme) =>
+  StyleSheet.create({
+    container: { flex: 1, backgroundColor: theme.colors.background },
+    content: {
+      paddingHorizontal: theme.spacing.containerMargin,
+      paddingTop: theme.spacing.xl,
+      paddingBottom: theme.spacing.xxl,
+    },
+    title: {
+      fontFamily: theme.fontFamily.display,
+      fontSize: theme.fontSize.headline,
+      color: theme.colors.text,
+      textTransform: 'uppercase',
+      marginBottom: theme.spacing.xs,
+    },
+    subtitle: {
+      fontFamily: theme.fontFamily.body,
+      fontSize: theme.fontSize.sm,
+      color: theme.colors.textVariant,
+      marginBottom: theme.spacing.xl,
+    },
+    grid: { gap: theme.spacing.md },
+    card: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: theme.colors.surfaceContainer,
+      borderRadius: theme.radius.xl,
+      borderWidth: 1,
+      borderColor: theme.colors.outlineVariant,
+      padding: theme.spacing.lg,
+    },
+    iconCircle: {
+      width: 52,
+      height: 52,
+      borderRadius: theme.radius.full,
+      backgroundColor: theme.colors.primary + '1A',
+      borderWidth: 1,
+      borderColor: theme.colors.primary + '4D',
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginRight: theme.spacing.lg,
+    },
+    iconEmoji: { fontSize: 24 },
+    cardLabel: {
+      fontFamily: theme.fontFamily.bodyBold,
+      fontSize: theme.fontSize.title,
+      color: theme.colors.text,
+      letterSpacing: 0.5,
+    },
+  });

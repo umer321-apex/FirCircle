@@ -1,21 +1,13 @@
 import { useState } from 'react';
-import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  StyleSheet,
-  ScrollView,
-  ActivityIndicator,
-} from 'react-native';
-import workoutService from '../../services/workoutService';
-import theme from '../../constants/theme';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator } from 'react-native';
 import NetInfo from '@react-native-community/netinfo';
+import { useTheme } from '../../context/ThemeContext';
+import workoutService from '../../services/workoutService';
 import offlineQueueService from '../../services/offlineQueueService';
 
-// route.params.exercise (optional) lets this screen be opened directly from
-// ExerciseDetailScreen with the exercise pre-filled; otherwise starts blank.
 export default function LogWorkoutScreen({ route, navigation }) {
+  const { theme } = useTheme();
+  const styles = createStyles(theme);
   const prefilledExercise = route?.params?.exercise;
 
   const [splitCategory, setSplitCategory] = useState(prefilledExercise?.splitCategory || '');
@@ -27,7 +19,7 @@ export default function LogWorkoutScreen({ route, navigation }) {
   const [success, setSuccess] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-    const handleSubmit = async () => {
+  const handleSubmit = async () => {
     setError('');
     setSuccess(false);
 
@@ -62,17 +54,13 @@ export default function LogWorkoutScreen({ route, navigation }) {
     try {
       if (netState.isConnected) {
         await workoutService.logWorkout(splitCategory.trim(), entries);
-        setSuccess(true);
       } else {
         await offlineQueueService.enqueueWorkout(splitCategory.trim(), entries);
-        setSuccess(true);
-        setError(''); // clear any prior error — queuing is a success state, not a failure
       }
+      setSuccess(true);
       setReps('');
       setWeightKg('');
     } catch (err) {
-      // Network request itself failed even though NetInfo said we're connected —
-      // queue it locally rather than losing the data
       console.error(`[LogWorkoutScreen] Log error, queuing offline: ${err.message}`);
       await offlineQueueService.enqueueWorkout(splitCategory.trim(), entries);
       setSuccess(true);
@@ -83,11 +71,11 @@ export default function LogWorkoutScreen({ route, navigation }) {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <Text style={styles.title}>Log Workout</Text>
+      <Text style={styles.title}>LOG WORKOUT</Text>
       <Text style={styles.subtitle}>Track today's session</Text>
 
       <View style={styles.form}>
-        <Text style={styles.label}>Split</Text>
+        <Text style={styles.label}>SPLIT</Text>
         <TextInput
           style={styles.input}
           placeholder="e.g. Chest Day"
@@ -96,7 +84,7 @@ export default function LogWorkoutScreen({ route, navigation }) {
           onChangeText={setSplitCategory}
         />
 
-        <Text style={styles.label}>Exercise</Text>
+        <Text style={styles.label}>EXERCISE</Text>
         <TextInput
           style={styles.input}
           placeholder="e.g. Barbell Bench Press"
@@ -107,37 +95,16 @@ export default function LogWorkoutScreen({ route, navigation }) {
 
         <View style={styles.row}>
           <View style={styles.rowItem}>
-            <Text style={styles.label}>Sets</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="3"
-              placeholderTextColor={theme.colors.muted}
-              value={sets}
-              onChangeText={setSets}
-              keyboardType="number-pad"
-            />
+            <Text style={styles.label}>SETS</Text>
+            <TextInput style={styles.input} placeholder="3" placeholderTextColor={theme.colors.muted} value={sets} onChangeText={setSets} keyboardType="number-pad" />
           </View>
           <View style={styles.rowItem}>
-            <Text style={styles.label}>Reps</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="10"
-              placeholderTextColor={theme.colors.muted}
-              value={reps}
-              onChangeText={setReps}
-              keyboardType="number-pad"
-            />
+            <Text style={styles.label}>REPS</Text>
+            <TextInput style={styles.input} placeholder="10" placeholderTextColor={theme.colors.muted} value={reps} onChangeText={setReps} keyboardType="number-pad" />
           </View>
           <View style={styles.rowItem}>
-            <Text style={styles.label}>Weight (kg)</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="40"
-              placeholderTextColor={theme.colors.muted}
-              value={weightKg}
-              onChangeText={setWeightKg}
-              keyboardType="decimal-pad"
-            />
+            <Text style={styles.label}>WEIGHT (KG)</Text>
+            <TextInput style={styles.input} placeholder="40" placeholderTextColor={theme.colors.muted} value={weightKg} onChangeText={setWeightKg} keyboardType="decimal-pad" />
           </View>
         </View>
 
@@ -145,92 +112,82 @@ export default function LogWorkoutScreen({ route, navigation }) {
         {success && <Text style={styles.successText}>✓ Workout logged (will sync if offline)!</Text>}
 
         <TouchableOpacity
-          style={[styles.button, isSubmitting && styles.buttonDisabled]}
+          style={[styles.button, theme.glow.secondary, isSubmitting && styles.buttonDisabled]}
           onPress={handleSubmit}
           disabled={isSubmitting}
           activeOpacity={0.85}
         >
-          {isSubmitting ? (
-            <ActivityIndicator color={theme.colors.white} />
-          ) : (
-            <Text style={styles.buttonText}>Log Set</Text>
-          )}
+          {isSubmitting ? <ActivityIndicator color={theme.colors.onSecondary} /> : <Text style={styles.buttonText}>LOG SET</Text>}
         </TouchableOpacity>
       </View>
     </ScrollView>
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: theme.colors.background },
-  content: {
-    paddingHorizontal: theme.spacing.lg,
-    paddingVertical: theme.spacing.xxl,
-  },
-  title: {
-    fontSize: theme.fontSize.xl,
-    fontWeight: theme.fontWeight.bold,
-    color: theme.colors.text,
-    marginBottom: theme.spacing.xs,
-  },
-  subtitle: {
-    fontSize: theme.fontSize.sm,
-    color: theme.colors.muted,
-    marginBottom: theme.spacing.xl,
-  },
-  form: {
-    backgroundColor: theme.colors.surface,
-    borderRadius: theme.radius.lg,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    padding: theme.spacing.lg,
-  },
-  label: {
-    fontSize: theme.fontSize.sm,
-    fontWeight: theme.fontWeight.medium,
-    color: theme.colors.text,
-    marginBottom: theme.spacing.xs,
-    marginTop: theme.spacing.md,
-  },
-  input: {
-    backgroundColor: theme.colors.surfaceLight,
-    borderRadius: theme.radius.md,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    paddingHorizontal: theme.spacing.md,
-    paddingVertical: theme.spacing.sm + 4,
-    fontSize: theme.fontSize.md,
-    color: theme.colors.text,
-  },
-  row: {
-    flexDirection: 'row',
-    gap: theme.spacing.sm,
-  },
-  rowItem: {
-    flex: 1,
-  },
-  errorText: {
-    color: theme.colors.danger,
-    fontSize: theme.fontSize.sm,
-    marginTop: theme.spacing.md,
-  },
-  successText: {
-    color: theme.colors.success,
-    fontSize: theme.fontSize.sm,
-    fontWeight: theme.fontWeight.semibold,
-    marginTop: theme.spacing.md,
-  },
-  button: {
-    backgroundColor: theme.colors.primary,
-    borderRadius: theme.radius.md,
-    paddingVertical: theme.spacing.md,
-    alignItems: 'center',
-    marginTop: theme.spacing.lg,
-  },
-  buttonDisabled: { opacity: 0.7 },
-  buttonText: {
-    color: theme.colors.white,
-    fontSize: theme.fontSize.md,
-    fontWeight: theme.fontWeight.semibold,
-  },
-});
+const createStyles = (theme) =>
+  StyleSheet.create({
+    container: { flex: 1, backgroundColor: theme.colors.background },
+    content: { paddingHorizontal: theme.spacing.containerMargin, paddingVertical: theme.spacing.xxl },
+    title: {
+      fontFamily: theme.fontFamily.display,
+      fontSize: theme.fontSize.headline,
+      color: theme.colors.text,
+      textTransform: 'uppercase',
+      marginBottom: theme.spacing.xs,
+    },
+    subtitle: {
+      fontFamily: theme.fontFamily.body,
+      fontSize: theme.fontSize.sm,
+      color: theme.colors.textVariant,
+      marginBottom: theme.spacing.xl,
+    },
+    form: {
+      backgroundColor: theme.colors.surfaceContainer,
+      borderRadius: theme.radius.xl,
+      borderWidth: 1,
+      borderColor: theme.colors.outlineVariant,
+      padding: theme.spacing.lg,
+    },
+    label: {
+      fontFamily: theme.fontFamily.label,
+      fontSize: 10,
+      color: theme.colors.textVariant,
+      letterSpacing: 1,
+      marginBottom: theme.spacing.xs,
+      marginTop: theme.spacing.md,
+    },
+    input: {
+      backgroundColor: theme.colors.surfaceHigh,
+      borderRadius: theme.radius.lg,
+      borderWidth: 1,
+      borderColor: theme.colors.outlineVariant,
+      paddingHorizontal: theme.spacing.md,
+      paddingVertical: theme.spacing.sm + 4,
+      fontFamily: theme.fontFamily.body,
+      fontSize: theme.fontSize.md,
+      color: theme.colors.text,
+    },
+    row: { flexDirection: 'row', gap: theme.spacing.sm },
+    rowItem: { flex: 1 },
+    errorText: { color: theme.colors.danger, fontSize: theme.fontSize.sm, marginTop: theme.spacing.md },
+    successText: {
+      fontFamily: theme.fontFamily.bodyBold,
+      color: theme.colors.secondary,
+      fontSize: theme.fontSize.sm,
+      marginTop: theme.spacing.md,
+    },
+    button: {
+      backgroundColor: theme.colors.secondary,
+      borderRadius: theme.radius.lg,
+      paddingVertical: theme.spacing.md,
+      alignItems: 'center',
+      marginTop: theme.spacing.lg,
+    },
+    buttonDisabled: { opacity: 0.7 },
+    buttonText: {
+      fontFamily: theme.fontFamily.label,
+      color: theme.colors.onSecondary,
+      fontSize: theme.fontSize.sm,
+      letterSpacing: 1,
+    },
+  });

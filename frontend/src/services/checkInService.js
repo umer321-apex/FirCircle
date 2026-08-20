@@ -1,8 +1,8 @@
 import api from './api';
 
-const createCheckIn = async (lat, lng) => {
-  const response = await api.post('/checkins', { lat, lng });
-  return response.data; // { checkIn, message? }
+const createCheckIn = async (lat, lng, manual = false) => {
+  const response = await api.post('/checkins', { lat, lng, manual });
+  return response.data; // { checkIn, withinRadius, distanceMeters, message? } — checkIn may be null if too far and not manual
 };
 
 const getMyCheckIns = async () => {

@@ -215,7 +215,7 @@ const styles = StyleSheet.create({
     borderColor: theme.colors.border,
     padding: theme.spacing.md,
     marginBottom: theme.spacing.md,
-    ...theme.shadow.card,
+    ...theme.glow.subtle,
   },
   headerRow: {
     flexDirection: 'row',

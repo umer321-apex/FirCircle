@@ -16,6 +16,10 @@ const gymCheckInSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    manual: {
+      type: Boolean, // true if the user explicitly tapped "check in manually"
+      default: false,
+    },
     gymNameUsed: {
       type: String,
     },

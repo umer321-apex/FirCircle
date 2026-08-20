@@ -8,9 +8,22 @@ import theme from '../../constants/theme';
 export default function GymCheckInScreen() {
   const { getCurrentLocation, isLoading: isLocating, permissionDenied } = useLocation();
 
-  const [status, setStatus] = useState('idle'); // 'idle' | 'checking' | 'auto' | 'manual' | 'error'
+  // 'idle' | 'checking' | 'auto' | 'manualDone' | 'tooFar' | 'error'
+  // 'auto' / 'manualDone' = a check-in record was actually created (verified / self-reported).
+  // 'tooFar' = no record created yet — user is out of range and must explicitly tap "check in manually".
+  const [status, setStatus] = useState('idle');
   const [distanceMeters, setDistanceMeters] = useState(null);
   const [errorMessage, setErrorMessage] = useState('');
+
+  const applyCheckInResult = (data) => {
+    setDistanceMeters(data.distanceMeters ?? data.checkIn?.distanceMeters ?? null);
+    if (!data.checkIn) {
+      // Not within radius and this wasn't a manual attempt — nothing was recorded.
+      setStatus('tooFar');
+      return;
+    }
+    setStatus(data.checkIn.autoVerified ? 'auto' : 'manualDone');
+  };
 
   const attemptCheckIn = useCallback(async () => {
     setStatus('checking');
@@ -29,9 +42,10 @@ export default function GymCheckInScreen() {
     }
 
     try {
-      const data = await checkInService.createCheckIn(location.lat, location.lng);
-      setDistanceMeters(data.checkIn.distanceMeters ?? null);
-      setStatus(data.checkIn.autoVerified ? 'auto' : 'manual');
+      // manual: false — this is just the automatic on-open proximity check.
+      // It only ever creates a record if we're actually within radius.
+      const data = await checkInService.createCheckIn(location.lat, location.lng, false);
+      applyCheckInResult(data);
     } catch (err) {
       const message = err.response?.data?.message || 'Check-in failed. Please try again.';
       console.error(`[GymCheckInScreen] Check-in error: ${message}`);
@@ -48,25 +62,22 @@ export default function GymCheckInScreen() {
   );
 
   const handleManualCheckIn = async () => {
-    // Manual fallback still sends whatever location we can get — if outside
-    // radius or location fails entirely, backend still records it as unverified
+    // Explicit user action — re-fetch a fresh location (don't reuse a stale
+    // one) and re-check distance server-side before recording anything.
     setStatus('checking');
     setErrorMessage('');
 
     const location = await getCurrentLocation();
 
-    try {
-      const data = location
-        ? await checkInService.createCheckIn(location.lat, location.lng)
-        : null;
+    if (!location) {
+      setStatus('error');
+      setErrorMessage('Could not determine your location for manual check-in.');
+      return;
+    }
 
-      if (data) {
-        setDistanceMeters(data.checkIn.distanceMeters ?? null);
-        setStatus(data.checkIn.autoVerified ? 'auto' : 'manual');
-      } else {
-        setStatus('error');
-        setErrorMessage('Could not determine your location for manual check-in.');
-      }
+    try {
+      const data = await checkInService.createCheckIn(location.lat, location.lng, true);
+      applyCheckInResult(data);
     } catch (err) {
       const message = err.response?.data?.message || 'Manual check-in failed.';
       console.error(`[GymCheckInScreen] Manual check-in error: ${message}`);
@@ -86,8 +97,8 @@ export default function GymCheckInScreen() {
         style={[
           styles.statusCard,
           status === 'auto' && styles.statusCardAuto,
-          status === 'manual' && styles.statusCardManual,
-          status === 'error' && styles.statusCardError,
+          status === 'manualDone' && styles.statusCardManual,
+          (status === 'tooFar' || status === 'error') && styles.statusCardError,
         ]}
       >
         {(status === 'idle' || status === 'checking' || isLocating) && (
@@ -112,7 +123,7 @@ export default function GymCheckInScreen() {
           </>
         )}
 
-        {status === 'manual' && (
+        {status === 'manualDone' && (
           <>
             <View style={[styles.iconCircle, { backgroundColor: theme.colors.warning }]}>
               <Text style={styles.iconText}>✓</Text>
@@ -121,6 +132,24 @@ export default function GymCheckInScreen() {
               Checked in
             </Text>
             <Text style={styles.statusSubtext}>Manual — not auto-verified</Text>
+            {distanceMeters !== null && (
+              <Text style={styles.distanceText}>{distanceMeters}m from your home gym</Text>
+            )}
+          </>
+        )}
+
+        {status === 'tooFar' && (
+          <>
+            <View style={[styles.iconCircle, { backgroundColor: theme.colors.warning }]}>
+              <Text style={styles.iconText}>!</Text>
+            </View>
+            <Text style={[styles.statusHeadline, { color: theme.colors.warning }]}>
+              Too far to auto check-in
+            </Text>
+            <Text style={styles.statusSubtext}>
+              You're not near your home gym yet. Get closer, or confirm manually below if you're
+              actually there.
+            </Text>
             {distanceMeters !== null && (
               <Text style={styles.distanceText}>{distanceMeters}m from your home gym</Text>
             )}
@@ -140,7 +169,8 @@ export default function GymCheckInScreen() {
         )}
       </View>
 
-      {(status === 'error' || status === 'manual') && (
+      {/* Only offered when nothing has been recorded yet for today */}
+      {(status === 'error' || status === 'tooFar') && (
         <TouchableOpacity
           style={styles.retryButton}
           onPress={handleManualCheckIn}
@@ -148,6 +178,10 @@ export default function GymCheckInScreen() {
         >
           <Text style={styles.retryButtonText}>Check in manually</Text>
         </TouchableOpacity>
+      )}
+
+      {(status === 'auto' || status === 'manualDone') && (
+        <Text style={styles.alreadyDoneText}>You're all set for today.</Text>
       )}
     </View>
   );
@@ -179,7 +213,7 @@ const styles = StyleSheet.create({
     paddingVertical: theme.spacing.xxl,
     paddingHorizontal: theme.spacing.lg,
     alignItems: 'center',
-    ...theme.shadow.card,
+    ...theme.glow.subtle,
   },
   statusCardAuto: {
     borderColor: theme.colors.success,
@@ -237,5 +271,11 @@ const styles = StyleSheet.create({
     color: theme.colors.white,
     fontSize: theme.fontSize.md,
     fontWeight: theme.fontWeight.semibold,
+  },
+  alreadyDoneText: {
+    textAlign: 'center',
+    color: theme.colors.muted,
+    fontSize: theme.fontSize.sm,
+    marginTop: theme.spacing.xl,
   },
 });

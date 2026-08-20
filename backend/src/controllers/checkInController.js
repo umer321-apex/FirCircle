@@ -41,7 +41,8 @@ const updatePreferredCheckInHour = async (userId) => {
 
 const createCheckIn = async (req, res) => {
   try {
-    const { lat, lng } = req.body;
+    const { lat, lng, manual } = req.body;
+    const isManual = manual === true;
 
     if (typeof lat !== 'number' || typeof lng !== 'number') {
       return res.status(400).json({ message: 'lat and lng (numbers) are required' });
@@ -71,22 +72,37 @@ const createCheckIn = async (req, res) => {
     if (existing) {
       return res.status(200).json({
         checkIn: existing,
+        withinRadius: existing.autoVerified,
+        distanceMeters: existing.distanceMeters,
         message: 'Already checked in today',
       });
     }
 
     const distance = getDistanceInMeters(lat, lng, user.homeGym.lat, user.homeGym.lng);
-    const autoVerified = distance <= AUTO_VERIFY_RADIUS_METERS;
+    const withinRadius = distance <= AUTO_VERIFY_RADIUS_METERS;
+
+    // Only ever create a record when the user is actually in range, OR they
+    // explicitly asked for a manual (self-reported) check-in. Merely opening
+    // the screen from far away must NOT silently log attendance.
+    if (!withinRadius && !isManual) {
+      return res.status(200).json({
+        checkIn: null,
+        withinRadius: false,
+        distanceMeters: Math.round(distance),
+        message: `You're ${Math.round(distance)}m from your home gym — too far to auto check-in.`,
+      });
+    }
 
     const checkIn = await GymCheckIn.create({
       userId: user._id,
       date: today,
-      autoVerified,
+      autoVerified: withinRadius,
+      manual: isManual,
       gymNameUsed: user.homeGym.name,
       distanceMeters: Math.round(distance),
     });
     updatePreferredCheckInHour(user._id); // fire-and-forget, don't block the response
-    return res.status(201).json({ checkIn });
+    return res.status(201).json({ checkIn, withinRadius, distanceMeters: Math.round(distance) });
   } catch (error) {
     // Race condition: two near-simultaneous requests both pass the "existing" check
     // above, then collide on the unique index — this catches that cleanly.
@@ -94,7 +110,12 @@ const createCheckIn = async (req, res) => {
       console.error(`[checkInController.createCheckIn] Duplicate check-in race: ${error.message}`);
       const today = getTodayDateString();
       const existing = await GymCheckIn.findOne({ userId: req.user._id, date: today }).lean();
-      return res.status(200).json({ checkIn: existing, message: 'Already checked in today' });
+      return res.status(200).json({
+        checkIn: existing,
+        withinRadius: existing?.autoVerified,
+        distanceMeters: existing?.distanceMeters,
+        message: 'Already checked in today',
+      });
     }
 
     console.error(`[checkInController.createCheckIn] Error: ${error.message}`);

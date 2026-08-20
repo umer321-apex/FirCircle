@@ -1,23 +1,17 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
-import {
-  View,
-  Text,
-  FlatList,
-  TextInput,
-  TouchableOpacity,
-  StyleSheet,
-  KeyboardAvoidingView,
-  Platform,
-  ActivityIndicator,
-} from 'react-native';
+import { View, Text, FlatList, TextInput, TouchableOpacity, StyleSheet, KeyboardAvoidingView, Platform, ActivityIndicator } from 'react-native';
 import { useAuth } from '../../context/AuthContext';
-import theme from '../../constants/theme';
+import { useTheme } from '../../context/ThemeContext';
 import { getPodMessages, sendPodMessage } from '../../services/chatService';
 import { getSocket } from '../../services/socket';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function ChatPodScreen({ route }) {
   const { podId, podName } = route.params;
   const { user } = useAuth();
+  const { theme } = useTheme();
+  const styles = createStyles(theme);
+
   const [messages, setMessages] = useState([]);
   const [text, setText] = useState('');
   const [isLoading, setIsLoading] = useState(true);
@@ -26,6 +20,7 @@ export default function ChatPodScreen({ route }) {
   const flatListRef = useRef(null);
   const socketRef = useRef(null);
   const typingTimeoutRef = useRef(null);
+  const insets = useSafeAreaInsets();
 
   useEffect(() => {
     let isMounted = true;
@@ -45,9 +40,7 @@ export default function ChatPodScreen({ route }) {
       socket.emit('joinPod', podId);
 
       socket.on('newMessage', (msg) => {
-        if (msg.podId === podId) {
-          setMessages((prev) => [...prev, msg]);
-        }
+        if (msg.podId === podId) setMessages((prev) => [...prev, msg]);
       });
 
       socket.on('typing', ({ userId, podId: typingPodId }) => {
@@ -84,20 +77,19 @@ export default function ChatPodScreen({ route }) {
   };
 
   const handleSend = async () => {
-    if (!text.trim() || isSending) return;
-    setIsSending(true);
-    const messageText = text.trim();
-    setText('');
-    try {
-      await sendPodMessage(podId, messageText);
-      // newMessage arrives via socket broadcast, no need to manually append
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setIsSending(false);
-    }
-  };
-
+  if (!text.trim() || isSending) return;
+  setIsSending(true);
+  const messageText = text.trim();
+  setText('');
+  try {
+    const sent = await sendPodMessage(podId, messageText);
+    setMessages((prev) => (prev.some((m) => m._id === sent._id) ? prev : [...prev, sent]));
+  } catch (err) {
+    console.error(err);
+  } finally {
+    setIsSending(false);
+  }
+};
   if (isLoading) {
     return (
       <View style={styles.centered}>
@@ -107,11 +99,11 @@ export default function ChatPodScreen({ route }) {
   }
 
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      keyboardVerticalOffset={90}
-    >
+<KeyboardAvoidingView
+  style={styles.container}
+  behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+  keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top + 44 : 0}
+>
       <FlatList
         ref={flatListRef}
         data={messages}
@@ -122,10 +114,8 @@ export default function ChatPodScreen({ route }) {
           const isMine = item.senderId._id === user.id || item.senderId === user.id;
           return (
             <View style={[styles.bubbleRow, isMine ? styles.bubbleRowMine : styles.bubbleRowTheirs]}>
-              {!isMine && (
-                <Text style={styles.senderName}>{item.senderId.name}</Text>
-              )}
-              <View style={[styles.bubble, isMine ? styles.bubbleMine : styles.bubbleTheirs]}>
+              {!isMine && <Text style={styles.senderName}>{item.senderId.name}</Text>}
+              <View style={[styles.bubble, isMine ? [styles.bubbleMine, theme.glow.subtle] : styles.bubbleTheirs]}>
                 <Text style={[styles.bubbleText, isMine && styles.bubbleTextMine]}>{item.text}</Text>
               </View>
             </View>
@@ -133,9 +123,7 @@ export default function ChatPodScreen({ route }) {
         }}
       />
 
-      {typingUser && (
-        <Text style={styles.typingIndicator}>{typingUser}</Text>
-      )}
+      {typingUser && <Text style={styles.typingIndicator}>{typingUser}</Text>}
 
       <View style={styles.inputRow}>
         <TextInput
@@ -151,70 +139,69 @@ export default function ChatPodScreen({ route }) {
           onPress={handleSend}
           disabled={isSending || !text.trim()}
         >
-          <Text style={styles.sendButtonText}>{isSending ? '…' : 'Send'}</Text>
+          <Text style={styles.sendButtonText}>{isSending ? '…' : '➤'}</Text>
         </TouchableOpacity>
       </View>
     </KeyboardAvoidingView>
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: theme.colors.background },
-  centered: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.colors.background },
-  messageList: { padding: theme.spacing.md, paddingBottom: theme.spacing.lg },
-  bubbleRow: { marginBottom: theme.spacing.sm, maxWidth: '80%' },
-  bubbleRowMine: { alignSelf: 'flex-end', alignItems: 'flex-end' },
-  bubbleRowTheirs: { alignSelf: 'flex-start', alignItems: 'flex-start' },
-  senderName: { fontSize: theme.fontSize.xs, color: theme.colors.muted, marginBottom: 2, marginLeft: 4 },
-  bubble: {
-    paddingHorizontal: theme.spacing.md,
-    paddingVertical: theme.spacing.sm + 2,
-    borderRadius: theme.radius.lg,
-  },
-  bubbleMine: {
-    backgroundColor: theme.colors.primary,
-    borderBottomRightRadius: 4,
-  },
-  bubbleTheirs: {
-    backgroundColor: theme.colors.surfaceLight,
-    borderBottomLeftRadius: 4,
-  },
-  bubbleText: { fontSize: theme.fontSize.sm, color: theme.colors.text, lineHeight: 20 },
-  bubbleTextMine: { color: theme.colors.white },
-  typingIndicator: {
-    fontSize: theme.fontSize.xs,
-    color: theme.colors.muted,
-    fontStyle: 'italic',
-    paddingHorizontal: theme.spacing.lg,
-    paddingBottom: 4,
-  },
-  inputRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    padding: theme.spacing.md,
-    borderTopWidth: 1,
-    borderTopColor: theme.colors.border,
-    backgroundColor: theme.colors.surface,
-  },
-  input: {
-    flex: 1,
-    backgroundColor: theme.colors.surfaceLight,
-    borderRadius: theme.radius.lg,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    paddingHorizontal: theme.spacing.md,
-    paddingVertical: theme.spacing.sm + 2,
-    fontSize: theme.fontSize.sm,
-    color: theme.colors.text,
-    marginRight: theme.spacing.sm,
-    maxHeight: 100,
-  },
-  sendButton: {
-    backgroundColor: theme.colors.primary,
-    borderRadius: theme.radius.full,
-    paddingHorizontal: theme.spacing.lg,
-    paddingVertical: theme.spacing.sm + 4,
-  },
-  sendButtonDisabled: { opacity: 0.6 },
-  sendButtonText: { color: theme.colors.white, fontWeight: theme.fontWeight.semibold, fontSize: theme.fontSize.sm },
-});
+const createStyles = (theme) =>
+  StyleSheet.create({
+    container: { flex: 1, backgroundColor: theme.colors.background },
+    centered: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.colors.background },
+    messageList: { padding: theme.spacing.md, paddingBottom: theme.spacing.lg },
+    bubbleRow: { marginBottom: theme.spacing.sm, maxWidth: '80%' },
+    bubbleRowMine: { alignSelf: 'flex-end', alignItems: 'flex-end' },
+    bubbleRowTheirs: { alignSelf: 'flex-start', alignItems: 'flex-start' },
+    senderName: { fontFamily: theme.fontFamily.label, fontSize: 10, color: theme.colors.secondary, marginBottom: 2, marginLeft: 4, letterSpacing: 0.5 },
+    bubble: {
+      paddingHorizontal: theme.spacing.md,
+      paddingVertical: theme.spacing.sm + 2,
+      borderRadius: theme.radius.xl,
+    },
+    bubbleMine: { backgroundColor: theme.colors.primary, borderBottomRightRadius: 4 },
+    bubbleTheirs: { backgroundColor: theme.colors.surfaceContainer, borderWidth: 1, borderColor: theme.colors.outlineVariant, borderBottomLeftRadius: 4 },
+    bubbleText: { fontFamily: theme.fontFamily.body, fontSize: theme.fontSize.sm, color: theme.colors.text, lineHeight: 20 },
+    bubbleTextMine: { color: theme.colors.onPrimary },
+    typingIndicator: {
+      fontFamily: theme.fontFamily.body,
+      fontSize: theme.fontSize.xs,
+      color: theme.colors.muted,
+      fontStyle: 'italic',
+      paddingHorizontal: theme.spacing.lg,
+      paddingBottom: 4,
+    },
+    inputRow: {
+      flexDirection: 'row',
+      alignItems: 'flex-end',
+      padding: theme.spacing.md,
+      borderTopWidth: 1,
+      borderTopColor: theme.colors.outlineVariant,
+      backgroundColor: theme.colors.surfaceContainer,
+    },
+    input: {
+      flex: 1,
+      backgroundColor: theme.colors.surfaceHigh,
+      borderRadius: theme.radius.xl,
+      borderWidth: 1,
+      borderColor: theme.colors.outlineVariant,
+      paddingHorizontal: theme.spacing.md,
+      paddingVertical: theme.spacing.sm + 2,
+      fontFamily: theme.fontFamily.body,
+      fontSize: theme.fontSize.sm,
+      color: theme.colors.text,
+      marginRight: theme.spacing.sm,
+      maxHeight: 100,
+    },
+    sendButton: {
+      backgroundColor: theme.colors.primary,
+      borderRadius: theme.radius.full,
+      width: 44,
+      height: 44,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    sendButtonDisabled: { opacity: 0.5 },
+    sendButtonText: { color: theme.colors.onPrimary, fontWeight: '700', fontSize: theme.fontSize.md },
+  });

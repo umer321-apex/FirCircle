@@ -1,21 +1,16 @@
-import React, { useEffect, useState, useCallback } from 'react';
-import {
-  View,
-  Text,
-  FlatList,
-  TouchableOpacity,
-  StyleSheet,
-  ActivityIndicator,
-  RefreshControl,
-} from 'react-native';
+import React, { useState, useCallback } from 'react';
+import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, RefreshControl } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
-import theme from '../../constants/theme';
+import { useTheme } from '../../context/ThemeContext';
 import { getMyPods, getConversations } from '../../services/chatService';
 
 export default function ChatListScreen({ navigation }) {
+  const { theme } = useTheme();
+  const styles = createStyles(theme);
+
   const [pods, setPods] = useState([]);
   const [conversations, setConversations] = useState([]);
-  const [tab, setTab] = useState('pods'); // 'pods' | 'direct'
+  const [tab, setTab] = useState('pods');
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -32,16 +27,9 @@ export default function ChatListScreen({ navigation }) {
     }
   };
 
-  useFocusEffect(
-    useCallback(() => {
-      load();
-    }, [])
-  );
+  useFocusEffect(useCallback(() => { load(); }, []));
 
-  const onRefresh = () => {
-    setRefreshing(true);
-    load();
-  };
+  const onRefresh = () => { setRefreshing(true); load(); };
 
   if (isLoading) {
     return (
@@ -56,30 +44,22 @@ export default function ChatListScreen({ navigation }) {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Chat</Text>
+        <Text style={styles.headerTitle}>MESSAGES</Text>
         <TouchableOpacity
-          style={styles.newPodButton}
+          style={[styles.newPodButton, theme.glow.secondary]}
           onPress={() => navigation.navigate('CreatePod')}
-          activeOpacity={0.8}
+          activeOpacity={0.85}
         >
-          <Text style={styles.newPodButtonText}>+ New Pod</Text>
+          <Text style={styles.newPodButtonText}>+ NEW POD</Text>
         </TouchableOpacity>
       </View>
 
       <View style={styles.tabRow}>
-        <TouchableOpacity
-          style={[styles.tab, tab === 'pods' && styles.tabActive]}
-          onPress={() => setTab('pods')}
-        >
-          <Text style={[styles.tabText, tab === 'pods' && styles.tabTextActive]}>Pods</Text>
+        <TouchableOpacity style={[styles.tab, tab === 'pods' && styles.tabActive]} onPress={() => setTab('pods')}>
+          <Text style={[styles.tabText, tab === 'pods' && styles.tabTextActive]}>PODS</Text>
         </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.tab, tab === 'direct' && styles.tabActive]}
-          onPress={() => setTab('direct')}
-        >
-          <Text style={[styles.tabText, tab === 'direct' && styles.tabTextActive]}>
-            Direct Messages
-          </Text>
+        <TouchableOpacity style={[styles.tab, tab === 'direct' && styles.tabActive]} onPress={() => setTab('direct')}>
+          <Text style={[styles.tabText, tab === 'direct' && styles.tabTextActive]}>DIRECT</Text>
         </TouchableOpacity>
       </View>
 
@@ -92,10 +72,11 @@ export default function ChatListScreen({ navigation }) {
           tab === 'pods' ? (
             <TouchableOpacity
               style={styles.row}
-              activeOpacity={0.7}
+              activeOpacity={0.8}
               onPress={() => navigation.navigate('ChatPod', { podId: item._id, podName: item.name })}
             >
-              <View style={styles.avatar}>
+              <View style={styles.podHighlightBar} />
+              <View style={[styles.avatar, styles.avatarPod]}>
                 <Text style={styles.avatarText}>{item.name?.[0]?.toUpperCase() || 'P'}</Text>
               </View>
               <View style={{ flex: 1 }}>
@@ -106,16 +87,14 @@ export default function ChatListScreen({ navigation }) {
           ) : (
             <TouchableOpacity
               style={styles.row}
-              activeOpacity={0.7}
-              onPress={() =>
-                navigation.navigate('DirectMessage', {
-                  otherUserId: item.user._id,
-                  otherUserName: item.user.name,
-                })
-              }
+              activeOpacity={0.8}
+              onPress={() => navigation.navigate('DirectMessage', { otherUserId: item.user._id, otherUserName: item.user.name })}
             >
-              <View style={styles.avatar}>
-                <Text style={styles.avatarText}>{item.user.name?.[0]?.toUpperCase() || '?'}</Text>
+              <View style={styles.avatarWrap}>
+                <View style={styles.avatar}>
+                  <Text style={styles.avatarText}>{item.user.name?.[0]?.toUpperCase() || '?'}</Text>
+                </View>
+                <View style={styles.onlineDot} />
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={styles.rowTitle}>{item.user.name}</Text>
@@ -137,58 +116,93 @@ export default function ChatListScreen({ navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: theme.colors.background },
-  centered: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.colors.background },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: theme.spacing.lg,
-    paddingTop: theme.spacing.lg,
-    paddingBottom: theme.spacing.sm,
-  },
-  headerTitle: { fontSize: theme.fontSize.xxl, fontWeight: theme.fontWeight.bold, color: theme.colors.text },
-  newPodButton: {
-    backgroundColor: theme.colors.primary,
-    paddingHorizontal: theme.spacing.md,
-    paddingVertical: theme.spacing.sm,
-    borderRadius: theme.radius.full,
-  },
-  newPodButtonText: { color: theme.colors.white, fontWeight: theme.fontWeight.semibold, fontSize: theme.fontSize.sm },
-  tabRow: {
-    flexDirection: 'row',
-    marginHorizontal: theme.spacing.lg,
-    marginBottom: theme.spacing.sm,
-    backgroundColor: theme.colors.surfaceLight,
-    borderRadius: theme.radius.md,
-    padding: 4,
-  },
-  tab: { flex: 1, paddingVertical: theme.spacing.sm, alignItems: 'center', borderRadius: theme.radius.sm },
-  tabActive: { backgroundColor: theme.colors.surface, shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 4, shadowOffset: { width: 0, height: 1 }, elevation: 2 },
-  tabText: { fontSize: theme.fontSize.sm, color: theme.colors.muted, fontWeight: theme.fontWeight.medium },
-  tabTextActive: { color: theme.colors.primary, fontWeight: theme.fontWeight.semibold },
-  listContent: { paddingHorizontal: theme.spacing.lg, paddingBottom: theme.spacing.xl },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: theme.spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: theme.colors.border,
-  },
-  avatar: {
-    width: 48,
-    height: 48,
-    borderRadius: theme.radius.full,
-    backgroundColor: theme.colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: theme.spacing.md,
-  },
-  avatarText: { color: theme.colors.white, fontWeight: theme.fontWeight.bold, fontSize: theme.fontSize.md },
-  rowTitle: { fontSize: theme.fontSize.md, fontWeight: theme.fontWeight.semibold, color: theme.colors.text },
-  rowSubtitle: { fontSize: theme.fontSize.sm, color: theme.colors.muted, marginTop: 2 },
-  emptyState: { alignItems: 'center', paddingTop: theme.spacing.xxl * 2 },
-  emptyIcon: { fontSize: 40, marginBottom: theme.spacing.sm },
-  emptyText: { fontSize: theme.fontSize.sm, color: theme.colors.muted, textAlign: 'center' },
-});
+const createStyles = (theme) =>
+  StyleSheet.create({
+    container: { flex: 1, backgroundColor: theme.colors.background },
+    centered: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.colors.background },
+    header: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      paddingHorizontal: theme.spacing.containerMargin,
+      paddingTop: theme.spacing.xl,
+      paddingBottom: theme.spacing.md,
+    },
+    headerTitle: {
+      fontFamily: theme.fontFamily.display,
+      fontSize: theme.fontSize.headline,
+      color: theme.colors.text,
+    },
+    newPodButton: {
+      backgroundColor: theme.colors.secondary,
+      paddingHorizontal: theme.spacing.md,
+      paddingVertical: theme.spacing.sm,
+      borderRadius: theme.radius.full,
+    },
+    newPodButtonText: {
+      fontFamily: theme.fontFamily.label,
+      color: theme.colors.onSecondary,
+      fontSize: 10,
+      letterSpacing: 1,
+    },
+    tabRow: {
+      flexDirection: 'row',
+      marginHorizontal: theme.spacing.containerMargin,
+      marginBottom: theme.spacing.md,
+      backgroundColor: theme.colors.surfaceLow,
+      borderRadius: theme.radius.full,
+      padding: 4,
+    },
+    tab: { flex: 1, paddingVertical: theme.spacing.sm, alignItems: 'center', borderRadius: theme.radius.full },
+    tabActive: { backgroundColor: theme.colors.surfaceHigh },
+    tabText: { fontFamily: theme.fontFamily.label, fontSize: 10, color: theme.colors.muted, letterSpacing: 0.5 },
+    tabTextActive: { color: theme.colors.primary },
+    listContent: { paddingHorizontal: theme.spacing.containerMargin, paddingBottom: theme.spacing.xl, gap: theme.spacing.sm },
+    row: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: theme.colors.surfaceContainer,
+      borderRadius: theme.radius.lg,
+      borderWidth: 1,
+      borderColor: theme.colors.outlineVariant,
+      padding: theme.spacing.md,
+      overflow: 'hidden',
+    },
+    podHighlightBar: {
+      position: 'absolute',
+      left: 0,
+      top: 0,
+      bottom: 0,
+      width: 3,
+      backgroundColor: theme.colors.primary,
+    },
+    avatarWrap: { position: 'relative', marginRight: theme.spacing.md },
+    avatar: {
+      width: 48,
+      height: 48,
+      borderRadius: theme.radius.full,
+      backgroundColor: theme.colors.surfaceHigh,
+      borderWidth: 1,
+      borderColor: theme.colors.outlineVariant,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    avatarPod: { marginRight: theme.spacing.md, marginLeft: 8 },
+    avatarText: { fontFamily: theme.fontFamily.bodyBold, color: theme.colors.text, fontSize: theme.fontSize.md },
+    onlineDot: {
+      position: 'absolute',
+      bottom: 0,
+      right: 0,
+      width: 12,
+      height: 12,
+      borderRadius: 6,
+      backgroundColor: theme.colors.secondary,
+      borderWidth: 2,
+      borderColor: theme.colors.surfaceContainer,
+    },
+    rowTitle: { fontFamily: theme.fontFamily.bodyBold, fontSize: theme.fontSize.md, color: theme.colors.text },
+    rowSubtitle: { fontFamily: theme.fontFamily.body, fontSize: theme.fontSize.sm, color: theme.colors.textVariant, marginTop: 2 },
+    emptyState: { alignItems: 'center', paddingTop: theme.spacing.xxl * 2 },
+    emptyIcon: { fontSize: 40, marginBottom: theme.spacing.sm },
+    emptyText: { fontFamily: theme.fontFamily.body, fontSize: theme.fontSize.sm, color: theme.colors.textVariant, textAlign: 'center' },
+  });
