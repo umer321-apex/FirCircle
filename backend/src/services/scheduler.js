@@ -1,0 +1,21 @@
+const cron = require('node-cron');
+const { runCheckInReminderJob } = require('./checkInReminderJob');
+const { runWeeklyInsightJob } = require('./weeklyInsightJob');
+
+const startScheduledJobs = () => {
+  // Every hour, on the hour — checks which users' preferredCheckInHour matches now
+  cron.schedule('0 * * * *', () => {
+    console.log('[scheduler] Running check-in reminder job');
+    runCheckInReminderJob();
+  });
+
+  // Every Sunday at 9:00 AM server time — weekly insight alert
+  cron.schedule('0 9 * * 0', () => {
+    console.log('[scheduler] Running weekly insight job');
+    runWeeklyInsightJob();
+  });
+
+  console.log('[scheduler] Scheduled jobs registered (hourly check-in reminders, weekly insight on Sundays 9am)');
+};
+
+module.exports = { startScheduledJobs };

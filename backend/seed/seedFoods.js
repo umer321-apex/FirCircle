@@ -1,0 +1,239 @@
+require('dotenv').config();
+const mongoose = require('mongoose');
+const FoodItem = require('../src/models/FoodItem');
+
+const foods = [
+  // ---------------- Pakistan ----------------
+  {
+    name: 'Roti (whole wheat)',
+    country: 'PK',
+    mealSlots: ['breakfast', 'lunch', 'dinner'],
+    caloriesPer100g: 297,
+    protein: 11,
+    carbs: 55,
+    fat: 3.7,
+    glycemicIndex: 62,
+    saturatedFatHigh: false,
+    servingSizeG: 40,
+    description: 'A single whole wheat flatbread, a daily staple.',
+  },
+  {
+    name: 'Daal Chana (chickpea lentils)',
+    country: 'PK',
+    mealSlots: ['lunch', 'dinner'],
+    caloriesPer100g: 164,
+    protein: 9,
+    carbs: 27,
+    fat: 2.6,
+    glycemicIndex: 28,
+    saturatedFatHigh: false,
+    servingSizeG: 200,
+    description: 'Chickpea lentils simmered with onion, tomato, and mild spices.',
+  },
+  {
+    name: 'Chicken Karahi (light oil)',
+    country: 'PK',
+    mealSlots: ['lunch', 'dinner'],
+    caloriesPer100g: 189,
+    protein: 20,
+    carbs: 4,
+    fat: 10,
+    glycemicIndex: 0,
+    saturatedFatHigh: true,
+    servingSizeG: 200,
+    description: 'Tomato-based chicken curry — high protein, moderate saturated fat.',
+  },
+  {
+    name: 'Plain Basmati Rice',
+    country: 'PK',
+    mealSlots: ['lunch', 'dinner'],
+    caloriesPer100g: 130,
+    protein: 2.7,
+    carbs: 28,
+    fat: 0.3,
+    glycemicIndex: 58,
+    saturatedFatHigh: false,
+    servingSizeG: 150,
+    description: 'Steamed basmati rice, a lighter carb base than fried rice dishes.',
+  },
+  {
+    name: 'Chana Chaat (chickpea salad)',
+    country: 'PK',
+    mealSlots: ['breakfast', 'snack'],
+    caloriesPer100g: 164,
+    protein: 8,
+    carbs: 27,
+    fat: 2.5,
+    glycemicIndex: 28,
+    saturatedFatHigh: false,
+    servingSizeG: 150,
+    description: 'Boiled chickpeas with onion, tomato, and lemon — light and high fiber.',
+  },
+  {
+    name: 'Anda Paratha (egg paratha)',
+    country: 'PK',
+    mealSlots: ['breakfast'],
+    caloriesPer100g: 260,
+    protein: 9,
+    carbs: 24,
+    fat: 15,
+    glycemicIndex: 55,
+    saturatedFatHigh: true,
+    servingSizeG: 120,
+    description: 'Pan-fried flatbread stuffed with egg — filling, higher in saturated fat.',
+  },
+  {
+    name: 'Grilled Fish Tikka',
+    country: 'PK',
+    mealSlots: ['lunch', 'dinner'],
+    caloriesPer100g: 145,
+    protein: 24,
+    carbs: 2,
+    fat: 4.5,
+    glycemicIndex: 0,
+    saturatedFatHigh: false,
+    servingSizeG: 180,
+    description: 'Spiced grilled fish — lean protein, low saturated fat, diabetic-friendly.',
+  },
+  {
+    name: 'Sprouted Moong Salad',
+    country: 'PK',
+    mealSlots: ['breakfast', 'snack'],
+    caloriesPer100g: 105,
+    protein: 7,
+    carbs: 19,
+    fat: 0.4,
+    glycemicIndex: 25,
+    saturatedFatHigh: false,
+    servingSizeG: 150,
+    description: 'Sprouted moong beans with lemon and cucumber — low GI, heart-healthy.',
+  },
+
+  // ---------------- United States ----------------
+  {
+    name: 'Grilled Chicken Breast',
+    country: 'US',
+    mealSlots: ['lunch', 'dinner'],
+    caloriesPer100g: 165,
+    protein: 31,
+    carbs: 0,
+    fat: 3.6,
+    glycemicIndex: 0,
+    saturatedFatHigh: false,
+    servingSizeG: 170,
+    description: 'Skinless grilled chicken breast — lean, high protein.',
+  },
+  {
+    name: 'Oatmeal with Berries',
+    country: 'US',
+    mealSlots: ['breakfast'],
+    caloriesPer100g: 71,
+    protein: 2.5,
+    carbs: 12,
+    fat: 1.5,
+    glycemicIndex: 55,
+    saturatedFatHigh: false,
+    servingSizeG: 250,
+    description: 'Rolled oats topped with mixed berries — high fiber, low GI carb source.',
+  },
+  {
+    name: 'Scrambled Eggs (2 whole)',
+    country: 'US',
+    mealSlots: ['breakfast'],
+    caloriesPer100g: 148,
+    protein: 13,
+    carbs: 1.1,
+    fat: 10,
+    glycemicIndex: 0,
+    saturatedFatHigh: true,
+    servingSizeG: 100,
+    description: 'Two whole eggs scrambled — high protein, moderate saturated fat.',
+  },
+  {
+    name: 'Cheeseburger (fast food style)',
+    country: 'US',
+    mealSlots: ['lunch', 'dinner'],
+    caloriesPer100g: 250,
+    protein: 13,
+    carbs: 22,
+    fat: 12,
+    glycemicIndex: 60,
+    saturatedFatHigh: true,
+    servingSizeG: 220,
+    description: 'Classic beef cheeseburger — deprioritized for diabetes/cholesterol profiles.',
+  },
+  {
+    name: 'Brown Rice',
+    country: 'US',
+    mealSlots: ['lunch', 'dinner'],
+    caloriesPer100g: 123,
+    protein: 2.7,
+    carbs: 26,
+    fat: 1,
+    glycemicIndex: 50,
+    saturatedFatHigh: false,
+    servingSizeG: 150,
+    description: 'Whole-grain brown rice — lower GI than white rice.',
+  },
+  {
+    name: 'Grilled Salmon',
+    country: 'US',
+    mealSlots: ['lunch', 'dinner'],
+    caloriesPer100g: 208,
+    protein: 20,
+    carbs: 0,
+    fat: 13,
+    glycemicIndex: 0,
+    saturatedFatHigh: false,
+    servingSizeG: 170,
+    description: 'Fatty fish, rich in omega-3s — heart-healthy despite the fat content.',
+  },
+  {
+    name: 'Greek Yogurt with Honey',
+    country: 'US',
+    mealSlots: ['breakfast', 'snack'],
+    caloriesPer100g: 97,
+    protein: 9,
+    carbs: 6,
+    fat: 4,
+    glycemicIndex: 35,
+    saturatedFatHigh: false,
+    servingSizeG: 200,
+    description: 'Plain Greek yogurt with a small drizzle of honey — high protein snack.',
+  },
+  {
+    name: 'Caesar Salad with Grilled Chicken',
+    country: 'US',
+    mealSlots: ['lunch'],
+    caloriesPer100g: 158,
+    protein: 14,
+    carbs: 5,
+    fat: 9,
+    glycemicIndex: 15,
+    saturatedFatHigh: true,
+    servingSizeG: 300,
+    description: 'Romaine, grilled chicken, parmesan, and Caesar dressing.',
+  },
+];
+
+async function run() {
+  try {
+    await mongoose.connect(process.env.MONGODB_URI);
+    console.log('Connected to MongoDB Atlas for seeding...');
+
+    await FoodItem.deleteMany({});
+    console.log('Cleared existing FoodItem collection.');
+
+    const inserted = await FoodItem.insertMany(foods);
+    console.log(`Inserted ${inserted.length} food items.`);
+
+    await mongoose.disconnect();
+    console.log('Done.');
+    process.exit(0);
+  } catch (err) {
+    console.error('Seeding failed:', err);
+    process.exit(1);
+  }
+}
+
+run();
