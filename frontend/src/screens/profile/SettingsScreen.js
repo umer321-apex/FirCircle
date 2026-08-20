@@ -1,11 +1,13 @@
 import { useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Switch, ActivityIndicator, Alert } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
 import { useAuthContext } from '../../context/AuthContext';
 import { useSubscriptionContext } from '../../context/SubscriptionContext';
 import userService from '../../services/userService';
 import theme from '../../constants/theme';
 
 export default function SettingsScreen() {
+  const navigation = useNavigation();
   const { user, updateUser, logout } = useAuthContext();
   const { isPremium, setIsPremium } = useSubscriptionContext();
 
@@ -63,6 +65,23 @@ export default function SettingsScreen() {
           )}
         </View>
         {!!error && <Text style={styles.errorText}>{error}</Text>}
+      </View>
+
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Gym Schedule</Text>
+        <TouchableOpacity
+          style={styles.row}
+          onPress={() => navigation.navigate('GymSchedule')}
+          activeOpacity={0.7}
+        >
+          <View style={styles.rowText}>
+            <Text style={styles.rowLabel}>Reminder Times</Text>
+            <Text style={styles.rowHint}>
+              Set when you usually go — we'll remind you 5 minutes before
+            </Text>
+          </View>
+          <Text style={styles.chevron}>›</Text>
+        </TouchableOpacity>
       </View>
 
       {/* Dev-only Premium toggle — carried over from Step 14's local testing switch */}
@@ -138,6 +157,10 @@ const styles = StyleSheet.create({
     fontSize: theme.fontSize.xs,
     color: theme.colors.muted,
     marginTop: 2,
+  },
+  chevron: {
+    fontSize: theme.fontSize.title,
+    color: theme.colors.muted,
   },
   errorText: {
     color: theme.colors.danger,

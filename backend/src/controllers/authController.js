@@ -85,13 +85,15 @@ const login = async (req, res) => {
 
     const token = generateToken(user._id);
 
+    // Return the full user doc (minus passwordHash) so the frontend's
+    // isOnboarded check (goal/age/homeGym) has the real data immediately —
+    // not just id/name/email, which always looks "unonboarded".
+    const userObject = user.toObject();
+    delete userObject.passwordHash;
+
     return res.status(200).json({
       token,
-      user: {
-        id: user._id,
-        name: user.name,
-        email: user.email,
-      },
+      user: userObject,
     });
   } catch (error) {
     console.error(`[authController.login] Error: ${error.message}`);
@@ -183,4 +185,3 @@ const resetPassword = async (req, res) => {
 };
 
 module.exports = { register, login, requestPasswordReset, resetPassword };
-

@@ -17,6 +17,7 @@ const runCheckInReminderJob = async () => {
     const candidateUsers = await User.find({
       preferredCheckInHour: currentHour,
       expoPushToken: { $exists: true, $ne: null },
+      'gymSchedule.0': { $exists: false }, // users with an explicit schedule are handled by gymScheduleReminderJob instead
     })
       .select('_id expoPushToken')
       .lean();

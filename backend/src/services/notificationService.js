@@ -49,6 +49,19 @@ const sendCheckInReminder = async (expoPushToken) => {
   ]);
 };
 
+const sendGymTimeReminder = async (expoPushToken, slotLabel) => {
+  await sendPushNotifications([
+    {
+      to: expoPushToken,
+      title: "Hey, it's your gym time ⏰",
+      body: slotLabel
+        ? `Your "${slotLabel}" session starts in 5 minutes — time to head out!`
+        : 'Your gym session starts in 5 minutes — time to head out!',
+      data: { type: 'gym_schedule_reminder' },
+    },
+  ]);
+};
+
 const sendWeeklyInsightAlert = async (expoPushToken) => {
   await sendPushNotifications([
     {
@@ -60,4 +73,4 @@ const sendWeeklyInsightAlert = async (expoPushToken) => {
   ]);
 };
 
-module.exports = { sendPushNotifications, sendCheckInReminder, sendWeeklyInsightAlert };
+module.exports = { sendPushNotifications, sendCheckInReminder, sendGymTimeReminder, sendWeeklyInsightAlert };

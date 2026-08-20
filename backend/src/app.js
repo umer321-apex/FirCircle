@@ -15,6 +15,7 @@ const insightRoutes = require('./routes/insightRoutes');
 const subscriptionRoutes = require('./routes/subscriptionRoutes');
 const coachRoutes = require('./routes/coachRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
+const scheduleRoutes = require('./routes/scheduleRoutes');
 
 const app = express();
 
@@ -41,5 +42,6 @@ app.use('/api/insights', insightRoutes);
 app.use('/api/subscription', subscriptionRoutes);
 app.use('/api/coach', coachRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/users/me/schedule', scheduleRoutes);
 
 module.exports = app;
