@@ -24,7 +24,8 @@ const protect = async (req, res, next) => {
     if (!user) {
       return res.status(401).json({ message: 'Not authorized, user no longer exists' });
     }
-
+    user.id = user._id.toString(); // lean objects lack the virtual .id getter — add it explicitly
+                                 // since some controllers (chatController) use req.user.id
     req.user = user;
     next();
   } catch (error) {

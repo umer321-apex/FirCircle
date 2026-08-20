@@ -29,6 +29,12 @@ function attachSocketIO(server) {
       socket.join(`pod:${podId}`);
     });
 
+    socket.on('newMessage', (msg) => {
+  if (msg.podId === podId) {
+    setMessages((prev) => (prev.some((m) => m._id === msg._id) ? prev : [...prev, msg]));
+  }
+});
+
     socket.on('leavePod', (podId) => {
       socket.leave(`pod:${podId}`);
     });
