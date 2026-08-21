@@ -95,7 +95,11 @@ export default function DirectMessageScreen({ route }) {
   }
 
   return (
-    <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={90}>
+<KeyboardAvoidingView
+  style={styles.container}
+  behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+  keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top + 70 : 0}
+>
       <FlatList
         ref={flatListRef}
         data={messages}

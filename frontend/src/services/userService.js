@@ -10,4 +10,9 @@ const updateProfile = async ({ name, visibility }) => {
   return response.data;
 };
 
-export default { getMe, updateProfile };
+const searchUsers = async (query) => {
+  const response = await api.get('/users/search', { params: { q: query } });
+  return response.data.users;
+};
+
+export default { getMe, updateProfile, searchUsers };

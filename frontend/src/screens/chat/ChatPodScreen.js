@@ -102,7 +102,7 @@ export default function ChatPodScreen({ route }) {
 <KeyboardAvoidingView
   style={styles.container}
   behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-  keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top + 44 : 0}
+  keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top + 70 : 0}
 >
       <FlatList
         ref={flatListRef}

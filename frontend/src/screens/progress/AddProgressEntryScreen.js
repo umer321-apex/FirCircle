@@ -12,6 +12,7 @@ import {
 import * as ImagePicker from 'expo-image-picker';
 import progressService from '../../services/progressService';
 import theme from '../../constants/theme';
+import ShareToFeedModal from '../../components/feed/ShareToFeedModal';
 
 export default function AddProgressEntryScreen({ navigation }) {
   const [weightKg, setWeightKg] = useState('');
@@ -20,6 +21,8 @@ export default function AddProgressEntryScreen({ navigation }) {
   const [photoUri, setPhotoUri] = useState(null);
   const [error, setError] = useState('');
   const [uploadState, setUploadState] = useState('idle'); // 'idle' | 'uploading' | 'success'
+  const [savedEntryId, setSavedEntryId] = useState(null);
+  const [showShareModal, setShowShareModal] = useState(false);
 
   const pickImage = async () => {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -57,16 +60,23 @@ export default function AddProgressEntryScreen({ navigation }) {
       if (chestCm.trim()) measurements.chestCm = parseFloat(chestCm);
       if (waistCm.trim()) measurements.waistCm = parseFloat(waistCm);
 
-      await progressService.addProgressEntry({
+      const data = await progressService.addProgressEntry({
         weightKg: hasWeight ? parseFloat(weightKg) : undefined,
         measurements: Object.keys(measurements).length > 0 ? measurements : undefined,
         photoUri,
       });
 
       setUploadState('success');
+      setSavedEntryId(data.entry?._id || null);
+      // Give the user a moment to see the "Saved!" state, then offer to
+      // share instead of immediately navigating away.
       setTimeout(() => {
-        navigation.goBack();
-      }, 900);
+        if (data.entry?._id) {
+          setShowShareModal(true);
+        } else {
+          navigation.goBack();
+        }
+      }, 700);
     } catch (err) {
       const message = err.response?.data?.message || 'Could not save entry. Please try again.';
       console.error(`[AddProgressEntryScreen] Save error: ${message}`);
@@ -143,6 +153,17 @@ export default function AddProgressEntryScreen({ navigation }) {
           {uploadState === 'idle' && <Text style={styles.buttonText}>Save Entry</Text>}
         </TouchableOpacity>
       </View>
+
+      <ShareToFeedModal
+        visible={showShareModal}
+        type="progressPhoto"
+        contentRefId={savedEntryId}
+        onClose={() => {
+          setShowShareModal(false);
+          navigation.goBack();
+        }}
+        onShared={() => {}}
+      />
     </ScrollView>
   );
 }

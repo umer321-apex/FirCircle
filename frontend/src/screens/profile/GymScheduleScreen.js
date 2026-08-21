@@ -8,41 +8,32 @@ import {
   TextInput,
   ActivityIndicator,
   Alert,
+  Modal,
+  Platform,
 } from 'react-native';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import scheduleService from '../../services/scheduleService';
 import theme from '../../constants/theme';
 
 const MAX_SLOTS = 4;
 const DAY_LABELS = ['S', 'M', 'T', 'W', 'T', 'F', 'S']; // index 0 = Sunday, matches Date#getDay()
 const DURATION_OPTIONS = [30, 45, 60, 90, 120];
-const HOURS_12 = Array.from({ length: 12 }, (_, i) => i + 1); // 1-12
-const MINUTES = [0, 15, 30, 45];
 
-const emptyForm = () => ({
-  label: '',
-  hour12: 7,
-  minute: 0,
-  meridiem: 'AM',
-  durationMinutes: 60,
-  daysOfWeek: [1, 2, 3, 4, 5], // sensible default: weekdays
-});
-
-// Converts a 12-hour form value to the 0-23 value the backend stores.
-const to24Hour = (hour12, meridiem) => {
-  const h = hour12 % 12;
-  return meridiem === 'PM' ? h + 12 : h;
-};
-
-// Converts a stored 0-23 hour back to a 12-hour display value.
-const to12Hour = (hour24) => {
-  const meridiem = hour24 >= 12 ? 'PM' : 'AM';
-  let hour12 = hour24 % 12;
-  if (hour12 === 0) hour12 = 12;
-  return { hour12, meridiem };
+const emptyForm = () => {
+  const defaultTime = new Date();
+  defaultTime.setHours(7, 0, 0, 0); // sensible default: 7:00 AM
+  return {
+    label: '',
+    time: defaultTime,
+    durationMinutes: 60,
+    daysOfWeek: [1, 2, 3, 4, 5], // sensible default: weekdays
+  };
 };
 
 const formatTime = (hour, minute) => {
-  const { hour12, meridiem } = to12Hour(hour);
+  const meridiem = hour >= 12 ? 'PM' : 'AM';
+  let hour12 = hour % 12;
+  if (hour12 === 0) hour12 = 12;
   return `${hour12}:${String(minute).padStart(2, '0')} ${meridiem}`;
 };
 
@@ -63,6 +54,7 @@ export default function GymScheduleScreen() {
   // null = form closed, 'new' = adding, number = editing slots[index]
   const [editingIndex, setEditingIndex] = useState(null);
   const [form, setForm] = useState(emptyForm());
+  const [showTimePicker, setShowTimePicker] = useState(false);
 
   useEffect(() => {
     loadSchedule();
@@ -105,12 +97,11 @@ export default function GymScheduleScreen() {
 
   const openEditForm = (index) => {
     const slot = slots[index];
-    const { hour12, meridiem } = to12Hour(slot.hour);
+    const time = new Date();
+    time.setHours(slot.hour, slot.minute, 0, 0);
     setForm({
       label: slot.label || '',
-      hour12,
-      minute: slot.minute,
-      meridiem,
+      time,
       durationMinutes: slot.durationMinutes,
       daysOfWeek: [...slot.daysOfWeek],
     });
@@ -132,6 +123,16 @@ export default function GymScheduleScreen() {
     });
   };
 
+  const handleTimeChange = (event, selectedDate) => {
+    // Android's picker is a native dialog that closes itself; iOS's spinner
+    // stays open until the user taps Done below.
+    if (Platform.OS === 'android') {
+      setShowTimePicker(false);
+    }
+    if (event.type === 'dismissed' || !selectedDate) return;
+    setForm((prev) => ({ ...prev, time: selectedDate }));
+  };
+
   const handleSaveSlot = async () => {
     if (form.daysOfWeek.length === 0) {
       setError('Pick at least one day for this gym time.');
@@ -140,8 +141,8 @@ export default function GymScheduleScreen() {
 
     const newSlot = {
       label: form.label.trim(),
-      hour: to24Hour(form.hour12, form.meridiem),
-      minute: form.minute,
+      hour: form.time.getHours(),
+      minute: form.time.getMinutes(),
       durationMinutes: form.durationMinutes,
       daysOfWeek: form.daysOfWeek,
     };
@@ -236,39 +237,48 @@ export default function GymScheduleScreen() {
           />
 
           <Text style={styles.fieldLabel}>Time</Text>
-          <View style={styles.chipScrollRow}>
-            {HOURS_12.map((h) => (
-              <TouchableOpacity
-                key={h}
-                style={[styles.chip, form.hour12 === h && styles.chipActive]}
-                onPress={() => setForm((prev) => ({ ...prev, hour12: h }))}
-              >
-                <Text style={[styles.chipText, form.hour12 === h && styles.chipTextActive]}>{h}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-          <View style={styles.chipScrollRow}>
-            {MINUTES.map((m) => (
-              <TouchableOpacity
-                key={m}
-                style={[styles.chip, form.minute === m && styles.chipActive]}
-                onPress={() => setForm((prev) => ({ ...prev, minute: m }))}
-              >
-                <Text style={[styles.chipText, form.minute === m && styles.chipTextActive]}>
-                  :{String(m).padStart(2, '0')}
-                </Text>
-              </TouchableOpacity>
-            ))}
-            {['AM', 'PM'].map((m) => (
-              <TouchableOpacity
-                key={m}
-                style={[styles.chip, form.meridiem === m && styles.chipActive]}
-                onPress={() => setForm((prev) => ({ ...prev, meridiem: m }))}
-              >
-                <Text style={[styles.chipText, form.meridiem === m && styles.chipTextActive]}>{m}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
+          <TouchableOpacity
+            style={styles.timeDisplayButton}
+            onPress={() => setShowTimePicker(true)}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.timeDisplayText}>
+              {formatTime(form.time.getHours(), form.time.getMinutes())}
+            </Text>
+            <Text style={styles.timeDisplayHint}>Tap to change</Text>
+          </TouchableOpacity>
+
+          {showTimePicker && Platform.OS === 'android' && (
+            <DateTimePicker
+              value={form.time}
+              mode="time"
+              display="spinner"
+              onChange={handleTimeChange}
+            />
+          )}
+
+          {Platform.OS === 'ios' && (
+            <Modal visible={showTimePicker} transparent animationType="slide">
+              <View style={styles.pickerModalOverlay}>
+                <View style={styles.pickerModalSheet}>
+                  <DateTimePicker
+                    value={form.time}
+                    mode="time"
+                    display="spinner"
+                    onChange={handleTimeChange}
+                    textColor={theme.colors.text}
+                    style={styles.iosPicker}
+                  />
+                  <TouchableOpacity
+                    style={styles.pickerDoneButton}
+                    onPress={() => setShowTimePicker(false)}
+                  >
+                    <Text style={styles.pickerDoneButtonText}>Done</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </Modal>
+          )}
 
           <Text style={styles.fieldLabel}>Repeat on</Text>
           <View style={styles.daysRow}>
@@ -479,6 +489,53 @@ const styles = StyleSheet.create({
     paddingVertical: theme.spacing.sm,
     color: theme.colors.text,
     fontSize: theme.fontSize.sm,
+  },
+  timeDisplayButton: {
+    backgroundColor: theme.colors.surfaceLow,
+    borderRadius: theme.radius.md,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: theme.spacing.md,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  timeDisplayText: {
+    fontSize: theme.fontSize.md,
+    fontWeight: theme.fontWeight.semibold,
+    color: theme.colors.primary,
+  },
+  timeDisplayHint: {
+    fontSize: theme.fontSize.xs,
+    color: theme.colors.muted,
+  },
+  pickerModalOverlay: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0,0,0,0.4)',
+  },
+  pickerModalSheet: {
+    backgroundColor: theme.colors.surface,
+    borderTopLeftRadius: theme.radius.xl,
+    borderTopRightRadius: theme.radius.xl,
+    paddingBottom: theme.spacing.xl,
+  },
+  iosPicker: {
+    height: 200,
+  },
+  pickerDoneButton: {
+    marginHorizontal: theme.spacing.lg,
+    marginTop: theme.spacing.sm,
+    backgroundColor: theme.colors.primary,
+    borderRadius: theme.radius.md,
+    paddingVertical: theme.spacing.md,
+    alignItems: 'center',
+  },
+  pickerDoneButtonText: {
+    color: theme.colors.onPrimary,
+    fontSize: theme.fontSize.md,
+    fontWeight: theme.fontWeight.semibold,
   },
   chipScrollRow: {
     flexDirection: 'row',

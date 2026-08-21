@@ -1,9 +1,11 @@
-import { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
+import { useState, useRef } from 'react';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, FlatList } from 'react-native';
 import { useTheme } from '../../context/ThemeContext';
 import { createPod } from '../../services/chatService';
+import userService from '../../services/userService';
 
 const GOALS = ['cutting', 'bulking', 'maintenance'];
+const DEBOUNCE_MS = 400;
 
 export default function CreatePodScreen({ navigation }) {
   const { theme } = useTheme();
@@ -11,8 +13,46 @@ export default function CreatePodScreen({ navigation }) {
 
   const [name, setName] = useState('');
   const [goal, setGoal] = useState(null);
+  const [memberQuery, setMemberQuery] = useState('');
+  const [searchResults, setSearchResults] = useState([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [selectedMembers, setSelectedMembers] = useState([]); // [{ _id, name }]
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const debounceTimer = useRef(null);
+
+  const handleMemberQueryChange = (text) => {
+    setMemberQuery(text);
+    if (debounceTimer.current) clearTimeout(debounceTimer.current);
+
+    if (text.trim().length < 2) {
+      setSearchResults([]);
+      return;
+    }
+
+    debounceTimer.current = setTimeout(async () => {
+      setIsSearching(true);
+      try {
+        const users = await userService.searchUsers(text.trim());
+        // hide already-selected members from results
+        setSearchResults(users.filter((u) => !selectedMembers.some((m) => m._id === u._id)));
+      } catch (err) {
+        console.error(`[CreatePodScreen] Search error: ${err.message}`);
+      } finally {
+        setIsSearching(false);
+      }
+    }, DEBOUNCE_MS);
+  };
+
+  const addMember = (user) => {
+    setSelectedMembers((prev) => [...prev, user]);
+    setSearchResults((prev) => prev.filter((u) => u._id !== user._id));
+    setMemberQuery('');
+  };
+
+  const removeMember = (userId) => {
+    setSelectedMembers((prev) => prev.filter((m) => m._id !== userId));
+  };
 
   const handleCreate = async () => {
     setError('');
@@ -23,7 +63,11 @@ export default function CreatePodScreen({ navigation }) {
 
     setIsSubmitting(true);
     try {
-      const pod = await createPod(name.trim(), goal);
+      const pod = await createPod(
+        name.trim(),
+        goal,
+        selectedMembers.map((m) => m._id)
+      );
       navigation.replace('ChatPod', { podId: pod._id, podName: pod.name });
     } catch (err) {
       const message = err.response?.data?.message || 'Could not create pod. Please try again.';
@@ -33,7 +77,6 @@ export default function CreatePodScreen({ navigation }) {
       setIsSubmitting(false);
     }
   };
-  
 
   return (
     <View style={styles.container}>
@@ -68,6 +111,38 @@ export default function CreatePodScreen({ navigation }) {
             );
           })}
         </View>
+
+        <Text style={styles.label}>ADD MEMBERS</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="Search by name…"
+          placeholderTextColor={theme.colors.muted}
+          value={memberQuery}
+          onChangeText={handleMemberQueryChange}
+        />
+
+        {isSearching && <ActivityIndicator color={theme.colors.primary} style={{ marginTop: theme.spacing.sm }} />}
+
+        {searchResults.length > 0 && (
+          <View style={styles.resultsBox}>
+            {searchResults.map((user) => (
+              <TouchableOpacity key={user._id} style={styles.resultRow} onPress={() => addMember(user)} activeOpacity={0.8}>
+                <Text style={styles.resultName}>{user.name}</Text>
+                <Text style={styles.addIcon}>+</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
+
+        {selectedMembers.length > 0 && (
+          <View style={styles.chipsRow}>
+            {selectedMembers.map((m) => (
+              <TouchableOpacity key={m._id} style={styles.chip} onPress={() => removeMember(m._id)} activeOpacity={0.8}>
+                <Text style={styles.chipText}>{m.name} ✕</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
 
         {!!error && <Text style={styles.errorText}>{error}</Text>}
 
@@ -142,6 +217,34 @@ const createStyles = (theme) =>
     goalPillSelected: { backgroundColor: theme.colors.secondary, borderColor: theme.colors.secondary },
     goalPillText: { fontFamily: theme.fontFamily.body, fontSize: theme.fontSize.sm, color: theme.colors.text },
     goalPillTextSelected: { color: theme.colors.onSecondary, fontFamily: theme.fontFamily.bodyBold },
+    resultsBox: {
+      backgroundColor: theme.colors.surfaceHigh,
+      borderRadius: theme.radius.lg,
+      borderWidth: 1,
+      borderColor: theme.colors.outlineVariant,
+      marginTop: theme.spacing.xs,
+      overflow: 'hidden',
+    },
+    resultRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      padding: theme.spacing.md,
+      borderBottomWidth: 1,
+      borderBottomColor: theme.colors.outlineVariant,
+    },
+    resultName: { fontFamily: theme.fontFamily.body, fontSize: theme.fontSize.sm, color: theme.colors.text },
+    addIcon: { color: theme.colors.secondary, fontSize: theme.fontSize.md, fontWeight: '700' },
+    chipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing.sm, marginTop: theme.spacing.md },
+    chip: {
+      backgroundColor: theme.colors.primary + '1A',
+      borderWidth: 1,
+      borderColor: theme.colors.primary + '4D',
+      borderRadius: theme.radius.full,
+      paddingVertical: 6,
+      paddingHorizontal: 12,
+    },
+    chipText: { fontFamily: theme.fontFamily.body, fontSize: theme.fontSize.xs, color: theme.colors.primary },
     errorText: { color: theme.colors.danger, fontSize: theme.fontSize.sm, marginTop: theme.spacing.lg },
     button: {
       backgroundColor: theme.colors.secondary,

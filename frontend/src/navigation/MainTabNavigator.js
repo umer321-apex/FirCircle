@@ -17,11 +17,13 @@ import SocialFeedScreen from '../screens/feed/SocialFeedScreen';
 import PostDetailScreen from '../screens/feed/PostDetailScreen';
 import ChatListScreen from '../screens/chat/ChatListScreen';
 import ChatPodScreen from '../screens/chat/ChatPodScreen';
+import CreatePodScreen from '../screens/chat/CreatePodScreen';
 import DirectMessageScreen from '../screens/chat/DirectMessageScreen';
 import WeeklyInsightScreen from '../screens/insights/WeeklyInsightScreen';
 import CoachMarketplaceScreen from '../screens/coach/CoachMarketplaceScreen';
 import CoachPlanDetailScreen from '../screens/coach/CoachPlanDetailScreen';
 import PremiumPaywallScreen from '../screens/subscription/PremiumPaywallScreen';
+import NewMessageScreen from '../screens/chat/NewMessageScreen';
 
 // Workouts stack
 import WorkoutSplitScreen from '../screens/workouts/WorkoutSplitScreen';
@@ -63,6 +65,8 @@ function HomeStackNavigator() {
       <HomeStack.Screen name="PostDetail" component={PostDetailScreen} options={{ title: 'Post' }} />
       <HomeStack.Screen name="ChatList" component={ChatListScreen} options={{ title: 'Chats' }} />
       <HomeStack.Screen name="ChatPod" component={ChatPodScreen} options={{ title: 'Pod Chat' }} />
+      <HomeStack.Screen name="NewMessage" component={NewMessageScreen} options={{ title: 'New Message' }} />
+      <HomeStack.Screen name="CreatePod" component={CreatePodScreen} options={{ title: 'New Pod' }} />
       <HomeStack.Screen name="DirectMessage" component={DirectMessageScreen} options={{ title: 'Message' }} />
       <HomeStack.Screen name="WeeklyInsight" component={WeeklyInsightScreen} options={{ title: 'Weekly Insight' }} />
       <HomeStack.Screen name="CoachMarketplace" component={CoachMarketplaceScreen} options={{ title: 'Coach Marketplace' }} />

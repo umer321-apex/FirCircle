@@ -1,15 +1,6 @@
 import React, { useState } from 'react';
-import {
-  View,
-  Text,
-  TextInput,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  ActivityIndicator,
-  Alert,
-} from 'react-native';
-import  theme  from '../../constants/theme';
+import { View, Text, TextInput, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
+import { useTheme } from '../../context/ThemeContext';
 import { generateDietPlan } from '../../services/dietService';
 
 const CONDITIONS = [
@@ -18,6 +9,9 @@ const CONDITIONS = [
 ];
 
 export default function DietSetupScreen({ navigation }) {
+  const { theme } = useTheme();
+  const styles = createStyles(theme);
+
   const [weightKg, setWeightKg] = useState('');
   const [heightCm, setHeightCm] = useState('');
   const [age, setAge] = useState('');
@@ -27,9 +21,7 @@ export default function DietSetupScreen({ navigation }) {
   const [errors, setErrors] = useState({});
 
   const toggleCondition = (key) => {
-    setConditions((prev) =>
-      prev.includes(key) ? prev.filter((c) => c !== key) : [...prev, key]
-    );
+    setConditions((prev) => (prev.includes(key) ? prev.filter((c) => c !== key) : [...prev, key]));
   };
 
   const validate = () => {
@@ -56,10 +48,7 @@ export default function DietSetupScreen({ navigation }) {
       navigation.replace('DailyMealPlan');
     } catch (err) {
       if (err?.response?.status === 403) {
-        Alert.alert(
-          'Premium Feature',
-          'Personalized plan generation is a Premium feature. Upgrade to unlock it, or log meals manually for free.'
-        );
+        Alert.alert('Premium Feature', 'Personalized plan generation is a Premium feature. Upgrade to unlock it, or log meals manually for free.');
       } else {
         Alert.alert('Something went wrong', 'Please try again in a moment.');
       }
@@ -70,82 +59,51 @@ export default function DietSetupScreen({ navigation }) {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <Text style={styles.title}>Set Up Your Diet Plan</Text>
-      <Text style={styles.subtitle}>
-        We'll calculate your daily calorie and macro targets and suggest meals that fit your goal.
-      </Text>
+      <Text style={styles.title}>DIET SETUP</Text>
+      <Text style={styles.subtitle}>We'll calculate your daily calorie and macro targets and suggest meals that fit your goal.</Text>
 
-      <Field
-        label="Weight (kg)"
-        value={weightKg}
-        onChangeText={setWeightKg}
-        keyboardType="numeric"
-        placeholder="e.g. 72"
-        error={errors.weightKg}
-      />
-      <Field
-        label="Height (cm)"
-        value={heightCm}
-        onChangeText={setHeightCm}
-        keyboardType="numeric"
-        placeholder="e.g. 175"
-        error={errors.heightCm}
-      />
-      <Field
-        label="Age"
-        value={age}
-        onChangeText={setAge}
-        keyboardType="numeric"
-        placeholder="e.g. 27"
-        error={errors.age}
-      />
-      <Field
-        label="Country"
-        value={country}
-        onChangeText={setCountry}
-        placeholder="e.g. PK or US"
-        error={errors.country}
-      />
+      <View style={styles.form}>
+        <Field theme={theme} label="WEIGHT (KG)" value={weightKg} onChangeText={setWeightKg} keyboardType="numeric" placeholder="e.g. 72" error={errors.weightKg} />
+        <Field theme={theme} label="HEIGHT (CM)" value={heightCm} onChangeText={setHeightCm} keyboardType="numeric" placeholder="e.g. 175" error={errors.heightCm} />
+        <Field theme={theme} label="AGE" value={age} onChangeText={setAge} keyboardType="numeric" placeholder="e.g. 27" error={errors.age} />
+        <Field theme={theme} label="COUNTRY" value={country} onChangeText={setCountry} placeholder="e.g. PK or US" error={errors.country} />
 
-      <Text style={styles.sectionLabel}>Health Conditions (optional)</Text>
-      <View style={styles.conditionsRow}>
-        {CONDITIONS.map((c) => {
-          const selected = conditions.includes(c.key);
-          return (
-            <TouchableOpacity
-              key={c.key}
-              style={[styles.conditionChip, selected && styles.conditionChipSelected]}
-              onPress={() => toggleCondition(c.key)}
-            >
-              <Text style={[styles.conditionChipText, selected && styles.conditionChipTextSelected]}>
-                {c.label}
-              </Text>
-            </TouchableOpacity>
-          );
-        })}
+        <Text style={styles.sectionLabel}>HEALTH CONDITIONS (OPTIONAL)</Text>
+        <View style={styles.conditionsRow}>
+          {CONDITIONS.map((c) => {
+            const selected = conditions.includes(c.key);
+            return (
+              <TouchableOpacity
+                key={c.key}
+                style={[styles.conditionChip, selected && styles.conditionChipSelected]}
+                onPress={() => toggleCondition(c.key)}
+                activeOpacity={0.85}
+              >
+                <Text style={[styles.conditionChipText, selected && styles.conditionChipTextSelected]}>{c.label}</Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+
+        <TouchableOpacity
+          style={[styles.button, theme.glow.tertiary, loading && styles.buttonDisabled]}
+          onPress={handleGenerate}
+          disabled={loading}
+          activeOpacity={0.85}
+        >
+          {loading ? <ActivityIndicator color={theme.colors.onTertiary} /> : <Text style={styles.buttonText}>GENERATE MY PLAN</Text>}
+        </TouchableOpacity>
       </View>
 
-      <TouchableOpacity
-        style={[styles.button, loading && styles.buttonDisabled]}
-        onPress={handleGenerate}
-        disabled={loading}
-      >
-        {loading ? (
-          <ActivityIndicator color={theme.colors.background} />
-        ) : (
-          <Text style={styles.buttonText}>Generate My Plan</Text>
-        )}
-      </TouchableOpacity>
-
       <Text style={styles.disclaimer}>
-        This is general dietary guidance, not medical nutrition therapy. Please confirm your plan with a
-        doctor or registered dietitian, especially if you have a diagnosed health condition.
+        This is general dietary guidance, not medical nutrition therapy. Please confirm your plan with a doctor or registered dietitian, especially if you have a diagnosed health condition.
       </Text>
     </ScrollView>
   );
 }
 
-function Field({ label, error, ...props }) {
+function Field({ theme, label, error, ...props }) {
+  const styles = createStyles(theme);
   return (
     <View style={styles.fieldGroup}>
       <Text style={styles.fieldLabel}>{label}</Text>
@@ -155,93 +113,47 @@ function Field({ label, error, ...props }) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: theme.colors.background },
-  content: { padding: theme.spacing.lg, paddingBottom: theme.spacing.xl },
-  title: {
-    fontSize: theme.fontSize.xl,
-    fontWeight: theme.fontWeight.bold,
-    color: theme.colors.text,
-    marginBottom: theme.spacing.xs,
-  },
-  subtitle: {
-    fontSize: theme.fontSize.sm,
-    color: theme.colors.muted,
-    marginBottom: theme.spacing.lg,
-    lineHeight: 20,
-  },
-  fieldGroup: { marginBottom: theme.spacing.md },
-  fieldLabel: {
-    fontSize: theme.fontSize.sm,
-    fontWeight: theme.fontWeight.medium,
-    color: theme.colors.text,
-    marginBottom: theme.spacing.xs,
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    borderRadius: theme.radius.md,
-    padding: theme.spacing.md,
-    fontSize: theme.fontSize.md,
-    color: theme.colors.text,
-    backgroundColor: theme.colors.surface,
-  },
-  fieldError: {
-    fontSize: theme.fontSize.xs,
-    color: theme.colors.danger,
-    marginTop: theme.spacing.xs,
-  },
-  sectionLabel: {
-    fontSize: theme.fontSize.sm,
-    fontWeight: theme.fontWeight.semibold,
-    color: theme.colors.text,
-    marginBottom: theme.spacing.sm,
-    marginTop: theme.spacing.sm,
-  },
-  conditionsRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: theme.spacing.sm,
-    marginBottom: theme.spacing.lg,
-  },
-  conditionChip: {
-    paddingVertical: theme.spacing.sm,
-    paddingHorizontal: theme.spacing.md,
-    borderRadius: theme.radius.pill ?? 999,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    backgroundColor: theme.colors.surface,
-  },
-  conditionChipSelected: {
-    backgroundColor: theme.colors.primary,
-    borderColor: theme.colors.primary,
-  },
-  conditionChipText: {
-    fontSize: theme.fontSize.sm,
-    color: theme.colors.text,
-  },
-  conditionChipTextSelected: {
-    color: theme.colors.background,
-    fontWeight: theme.fontWeight.semibold,
-  },
-  button: {
-    backgroundColor: theme.colors.primary,
-    borderRadius: theme.radius.md,
-    paddingVertical: theme.spacing.md,
-    alignItems: 'center',
-    marginTop: theme.spacing.sm,
-  },
-  buttonDisabled: { opacity: 0.6 },
-  buttonText: {
-    color: theme.colors.background,
-    fontSize: theme.fontSize.md,
-    fontWeight: theme.fontWeight.bold,
-  },
-  disclaimer: {
-    fontSize: theme.fontSize.xs,
-    color: theme.colors.muted,
-    marginTop: theme.spacing.lg,
-    lineHeight: 16,
-    textAlign: 'center',
-  },
-});
+const createStyles = (theme) =>
+  StyleSheet.create({
+    container: { flex: 1, backgroundColor: theme.colors.background },
+    content: { padding: theme.spacing.containerMargin, paddingTop: theme.spacing.xl, paddingBottom: theme.spacing.xxl },
+    title: { fontFamily: theme.fontFamily.display, fontSize: theme.fontSize.headline, color: theme.colors.text, marginBottom: theme.spacing.xs },
+    subtitle: { fontFamily: theme.fontFamily.body, fontSize: theme.fontSize.sm, color: theme.colors.textVariant, marginBottom: theme.spacing.xl, lineHeight: 20 },
+    form: {
+      backgroundColor: theme.colors.surfaceContainer,
+      borderRadius: theme.radius.xl,
+      borderWidth: 1,
+      borderColor: theme.colors.outlineVariant,
+      padding: theme.spacing.lg,
+    },
+    fieldGroup: { marginBottom: theme.spacing.md },
+    fieldLabel: { fontFamily: theme.fontFamily.label, fontSize: 10, color: theme.colors.textVariant, letterSpacing: 1, marginBottom: theme.spacing.xs },
+    input: {
+      backgroundColor: theme.colors.surfaceHigh,
+      borderWidth: 1,
+      borderColor: theme.colors.outlineVariant,
+      borderRadius: theme.radius.lg,
+      padding: theme.spacing.md,
+      fontFamily: theme.fontFamily.body,
+      fontSize: theme.fontSize.md,
+      color: theme.colors.text,
+    },
+    fieldError: { fontSize: theme.fontSize.xs, color: theme.colors.danger, marginTop: theme.spacing.xs },
+    sectionLabel: { fontFamily: theme.fontFamily.label, fontSize: 10, color: theme.colors.textVariant, letterSpacing: 1, marginBottom: theme.spacing.sm, marginTop: theme.spacing.sm },
+    conditionsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing.sm, marginBottom: theme.spacing.lg },
+    conditionChip: {
+      paddingVertical: theme.spacing.sm,
+      paddingHorizontal: theme.spacing.md,
+      borderRadius: theme.radius.full,
+      borderWidth: 1,
+      borderColor: theme.colors.outlineVariant,
+      backgroundColor: theme.colors.surfaceHigh,
+    },
+    conditionChipSelected: { backgroundColor: theme.colors.tertiary, borderColor: theme.colors.tertiary },
+    conditionChipText: { fontFamily: theme.fontFamily.body, fontSize: theme.fontSize.sm, color: theme.colors.text },
+    conditionChipTextSelected: { color: theme.colors.onTertiary, fontFamily: theme.fontFamily.bodyBold },
+    button: { backgroundColor: theme.colors.tertiary, borderRadius: theme.radius.lg, paddingVertical: theme.spacing.md, alignItems: 'center', marginTop: theme.spacing.sm },
+    buttonDisabled: { opacity: 0.6 },
+    buttonText: { fontFamily: theme.fontFamily.label, color: theme.colors.onTertiary, fontSize: theme.fontSize.sm, letterSpacing: 1 },
+    disclaimer: { fontFamily: theme.fontFamily.body, fontSize: theme.fontSize.xs, color: theme.colors.muted, marginTop: theme.spacing.lg, lineHeight: 16, textAlign: 'center' },
+  });

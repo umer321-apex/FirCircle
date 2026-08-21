@@ -44,15 +44,24 @@ export default function ChatListScreen({ navigation }) {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>MESSAGES</Text>
-        <TouchableOpacity
-          style={[styles.newPodButton, theme.glow.secondary]}
-          onPress={() => navigation.navigate('CreatePod')}
-          activeOpacity={0.85}
-        >
-          <Text style={styles.newPodButtonText}>+ NEW POD</Text>
-        </TouchableOpacity>
-      </View>
+  <Text style={styles.headerTitle}>MESSAGES</Text>
+  <View style={{ flexDirection: 'row', gap: 8 }}>
+    <TouchableOpacity
+      style={styles.newMessageButton}
+      onPress={() => navigation.navigate('NewMessage')}
+      activeOpacity={0.85}
+    >
+      <Text style={styles.newMessageButtonText}>✎</Text>
+    </TouchableOpacity>
+    <TouchableOpacity
+      style={[styles.newPodButton, theme.glow.secondary]}
+      onPress={() => navigation.navigate('CreatePod')}
+      activeOpacity={0.85}
+    >
+      <Text style={styles.newPodButtonText}>+ NEW POD</Text>
+    </TouchableOpacity>
+  </View>
+</View>
 
       <View style={styles.tabRow}>
         <TouchableOpacity style={[styles.tab, tab === 'pods' && styles.tabActive]} onPress={() => setTab('pods')}>
@@ -200,6 +209,17 @@ const createStyles = (theme) =>
       borderWidth: 2,
       borderColor: theme.colors.surfaceContainer,
     },
+    newMessageButton: {
+      width: 36,
+      height: 36,
+      borderRadius: theme.radius.full,
+      backgroundColor: theme.colors.surfaceHigh,
+      borderWidth: 1,
+      borderColor: theme.colors.outlineVariant,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    newMessageButtonText: { fontSize: 16, color: theme.colors.text },
     rowTitle: { fontFamily: theme.fontFamily.bodyBold, fontSize: theme.fontSize.md, color: theme.colors.text },
     rowSubtitle: { fontFamily: theme.fontFamily.body, fontSize: theme.fontSize.sm, color: theme.colors.textVariant, marginTop: 2 },
     emptyState: { alignItems: 'center', paddingTop: theme.spacing.xxl * 2 },

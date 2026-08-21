@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import  theme  from '../../constants/theme';
 import { fetchTodayPlan } from '../../services/dietService';
+import ShareToFeedModal from '../../components/feed/ShareToFeedModal';
 
 const SLOTS = [
   { key: 'breakfast', label: 'Breakfast' },
@@ -21,6 +22,7 @@ export default function DailyMealPlanScreen({ navigation }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [showShareModal, setShowShareModal] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -89,7 +91,12 @@ export default function DailyMealPlanScreen({ navigation }) {
       </View>
 
       <View style={styles.totalsCard}>
-        <Text style={styles.totalsTitle}>Today's Progress</Text>
+        <View style={styles.totalsHeaderRow}>
+          <Text style={styles.totalsTitle}>Today's Progress</Text>
+          <TouchableOpacity onPress={() => setShowShareModal(true)} activeOpacity={0.7}>
+            <Text style={styles.shareText}>Share →</Text>
+          </TouchableOpacity>
+        </View>
         <View style={styles.totalsRow}>
           <MacroStat label="Calories" value={totals.calories} target={plan.targetCalories} unit="kcal" />
         </View>
@@ -136,6 +143,13 @@ export default function DailyMealPlanScreen({ navigation }) {
       >
         <Text style={styles.customButtonText}>+ Log a Custom Meal</Text>
       </TouchableOpacity>
+
+      <ShareToFeedModal
+        visible={showShareModal}
+        type="mealPlan"
+        contentRefId={plan._id}
+        onClose={() => setShowShareModal(false)}
+      />
     </ScrollView>
   );
 }
@@ -208,6 +222,17 @@ const styles = StyleSheet.create({
     fontSize: theme.fontSize.md,
     fontWeight: theme.fontWeight.semibold,
     color: theme.colors.text,
+    marginBottom: theme.spacing.md,
+  },
+  totalsHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  shareText: {
+    fontSize: theme.fontSize.sm,
+    color: theme.colors.primary,
+    fontWeight: theme.fontWeight.semibold,
     marginBottom: theme.spacing.md,
   },
   totalsRow: {
