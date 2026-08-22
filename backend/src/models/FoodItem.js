@@ -23,6 +23,9 @@ const foodItemSchema = new mongoose.Schema(
     saturatedFatHigh: { type: Boolean, default: false }, // used for cholesterol filtering
     servingSizeG: { type: Number, default: 100 }, // a "typical serving" for display purposes
     description: { type: String, default: '' },
+    // External URL only, same "cheapest option" pattern as Exercise.imageUrl — optional,
+    // hidden in the UI when blank.
+    imageUrl: { type: String, trim: true, default: '' },
   },
   { timestamps: true }
 );

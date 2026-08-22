@@ -32,11 +32,12 @@ const mealPlanSchema = new mongoose.Schema(
       carbs: { type: Number, required: true },
       fat: { type: Number, required: true },
     },
-    // For generated plans: 3 options per slot, user hasn't necessarily "picked" one yet
+    // For generated plans: options per slot, user hasn't necessarily "picked" one yet
     suggestedOptions: {
       breakfast: [{ type: mongoose.Schema.Types.ObjectId, ref: 'FoodItem' }],
       lunch: [{ type: mongoose.Schema.Types.ObjectId, ref: 'FoodItem' }],
       dinner: [{ type: mongoose.Schema.Types.ObjectId, ref: 'FoodItem' }],
+      snack: [{ type: mongoose.Schema.Types.ObjectId, ref: 'FoodItem' }],
     },
     // What the user has actually logged toward today's totals (generated pick or custom)
     meals: [mealEntrySchema],

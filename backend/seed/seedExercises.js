@@ -197,7 +197,134 @@ const exercises = [
       bulking: { sets: 4, reps: '8-10', restSeconds: 75, explanation: 'Heavier skull crushers directly target tricep mass for bigger arms.', caloriesPerSet: 4 },
     },
   },
+  // Push Day (chest/shoulders/triceps)
+  {
+    name: 'Flat Barbell Bench Press',
+    splitCategory: 'Push Day',
+    primaryMuscle: 'Chest',
+    imageUrl: '',
+    videoUrl: '',
+    variants: {
+      cutting: { sets: 3, reps: '12-15', restSeconds: 45, explanation: 'Higher reps and shorter rest keep your heart rate up, burning more calories while still building pushing endurance.', caloriesPerSet: 8 },
+      bulking: { sets: 4, reps: '6-8', restSeconds: 120, explanation: 'Heavier weight and lower reps with longer rest maximizes strength and muscle fiber recruitment for size.', caloriesPerSet: 6 },
+    },
+  },
+  {
+    name: 'Seated Dumbbell Shoulder Press',
+    splitCategory: 'Push Day',
+    primaryMuscle: 'Shoulders',
+    imageUrl: '',
+    videoUrl: '',
+    variants: {
+      cutting: { sets: 3, reps: '12-15', restSeconds: 45, explanation: 'Lighter pressing at higher reps builds shoulder endurance and burns extra calories.', caloriesPerSet: 7 },
+      bulking: { sets: 4, reps: '6-8', restSeconds: 120, explanation: 'Heavy overhead pressing builds overall shoulder mass and pushing strength.', caloriesPerSet: 6 },
+    },
+  },
+  {
+    name: 'Overhead Tricep Extension',
+    splitCategory: 'Push Day',
+    primaryMuscle: 'Triceps',
+    imageUrl: '',
+    videoUrl: '',
+    variants: {
+      cutting: { sets: 3, reps: '15-20', restSeconds: 30, explanation: 'High-rep extensions burn calories while keeping constant tension on the triceps.', caloriesPerSet: 4 },
+      bulking: { sets: 4, reps: '8-10', restSeconds: 75, explanation: 'Heavier extensions with more rest build tricep mass, which makes up most of arm size.', caloriesPerSet: 4 },
+    },
+  },
+  // Pull Day (back/biceps)
+  {
+    name: 'Conventional Deadlift',
+    splitCategory: 'Pull Day',
+    primaryMuscle: 'Back',
+    imageUrl: '',
+    videoUrl: '',
+    variants: {
+      cutting: { sets: 3, reps: '10-12', restSeconds: 60, explanation: 'Moderate reps on this full-body pull burn serious calories while keeping your back strong.', caloriesPerSet: 12 },
+      bulking: { sets: 4, reps: '5-6', restSeconds: 150, explanation: 'Heavy deadlifts with long rest are one of the best builders of total back and posterior chain mass.', caloriesPerSet: 10 },
+    },
+  },
+  {
+    name: 'Wide-Grip Lat Pulldown',
+    splitCategory: 'Pull Day',
+    primaryMuscle: 'Lats',
+    imageUrl: '',
+    videoUrl: '',
+    variants: {
+      cutting: { sets: 3, reps: '15-20', restSeconds: 30, explanation: 'High reps on the pulldown keep tension on your lats without needing max effort.', caloriesPerSet: 6 },
+      bulking: { sets: 4, reps: '8-10', restSeconds: 90, explanation: 'Controlled heavier pulldowns are a joint-friendly way to build lat width.', caloriesPerSet: 5 },
+    },
+  },
+  {
+    name: 'Seated Cable Row',
+    splitCategory: 'Pull Day',
+    primaryMuscle: 'Biceps/Back',
+    imageUrl: '',
+    videoUrl: '',
+    variants: {
+      cutting: { sets: 3, reps: '15-20', restSeconds: 30, explanation: 'Higher reps here build back and bicep endurance while keeping the workout intense.', caloriesPerSet: 6 },
+      bulking: { sets: 3, reps: '8-10', restSeconds: 75, explanation: 'Heavier rows add thickness to both the back and biceps.', caloriesPerSet: 5 },
+    },
+  },
+  // Legs Day (quads/hamstrings/glutes/calves)
+  {
+    name: 'Front Squat',
+    splitCategory: 'Legs Day',
+    primaryMuscle: 'Quads',
+    imageUrl: '',
+    videoUrl: '',
+    variants: {
+      cutting: { sets: 3, reps: '12-15', restSeconds: 60, explanation: 'Higher-rep squats are one of the best calorie-torching exercises in any cutting program.', caloriesPerSet: 13 },
+      bulking: { sets: 4, reps: '6-8', restSeconds: 150, explanation: 'Heavy squats are the king of mass builders for your entire lower body.', caloriesPerSet: 11 },
+    },
+  },
+  {
+    name: 'Hip Thrust',
+    splitCategory: 'Legs Day',
+    primaryMuscle: 'Glutes',
+    imageUrl: '',
+    videoUrl: '',
+    variants: {
+      cutting: { sets: 3, reps: '12-15', restSeconds: 45, explanation: 'Moderate weight and higher reps keep glutes working hard with less rest.', caloriesPerSet: 9 },
+      bulking: { sets: 4, reps: '6-8', restSeconds: 120, explanation: 'Heavier hip thrusts build serious glute mass over time.', caloriesPerSet: 8 },
+    },
+  },
+  {
+    name: 'Seated Calf Raise',
+    splitCategory: 'Legs Day',
+    primaryMuscle: 'Calves',
+    imageUrl: '',
+    videoUrl: '',
+    variants: {
+      cutting: { sets: 4, reps: '20-25', restSeconds: 20, explanation: 'High-rep calf raises with minimal rest add a solid calorie-burning finisher.', caloriesPerSet: 5 },
+      bulking: { sets: 4, reps: '10-12', restSeconds: 60, explanation: 'Heavier, controlled calf raises are needed to meaningfully grow this stubborn muscle.', caloriesPerSet: 4 },
+    },
+  },
 ];
+
+// Cheapest option for exercise videos: a YouTube search-results link per exercise
+// rather than a single hardcoded video ID (which could go dead or be wrong).
+// Query is biased toward men's-form tutorials per product requirement — this can't
+// guarantee every result is men-only since we don't inspect footage, so swap in
+// specific verified links later for exercises where that matters most.
+const toVideoUrl = (name) =>
+  `https://www.youtube.com/results?search_query=${encodeURIComponent(`${name} exercise tutorial form men`)}`;
+
+// Populated by `node seed/fetchExerciseImages.js`, which looks up a real photo
+// per exercise from wger.de's open exercise database. Optional — if that
+// script hasn't been run yet, this file just doesn't exist yet and every
+// exercise keeps imageUrl: '' (the frontend falls back to a placeholder photo
+// per exercise in that case — see frontend/src/utils/exerciseImage.js).
+let exerciseImages = {};
+try {
+  exerciseImages = require('./exerciseImages.json');
+} catch {
+  // not fetched yet — fine, falls through to placeholders
+}
+
+exercises.forEach((ex) => {
+  if (!ex.videoUrl) ex.videoUrl = toVideoUrl(ex.name);
+  if (!ex.imageUrl && exerciseImages[ex.name]) ex.imageUrl = exerciseImages[ex.name];
+});
 
 const runSeed = async () => {
   try {

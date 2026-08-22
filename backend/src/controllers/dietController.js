@@ -9,6 +9,12 @@ function todayMidnightUTC() {
   return d;
 }
 
+function daysAgoMidnightUTC(days) {
+  const d = todayMidnightUTC();
+  d.setUTCDate(d.getUTCDate() - days);
+  return d;
+}
+
 // POST /api/diet/generate  (Premium only — gated by premiumMiddleware on the route)
 exports.generatePlan = async (req, res, next) => {
   try {
@@ -27,11 +33,13 @@ exports.generatePlan = async (req, res, next) => {
       age,
       sex: user.sex,
       goal: user.goal,
+      activityLevel: user.activityLevel,
     });
 
     const suggestedOptions = await mealSuggestionService.buildDailySuggestions({
       country,
       healthConditions,
+      targetCalories,
     });
 
     const date = todayMidnightUTC();
@@ -47,6 +55,7 @@ exports.generatePlan = async (req, res, next) => {
           breakfast: suggestedOptions.breakfast.map((f) => f._id),
           lunch: suggestedOptions.lunch.map((f) => f._id),
           dinner: suggestedOptions.dinner.map((f) => f._id),
+          snack: suggestedOptions.snack.map((f) => f._id),
         },
       },
       { upsert: true, new: true, setDefaultsOnInsert: true }
@@ -56,10 +65,15 @@ exports.generatePlan = async (req, res, next) => {
       { path: 'suggestedOptions.breakfast' },
       { path: 'suggestedOptions.lunch' },
       { path: 'suggestedOptions.dinner' },
+      { path: 'suggestedOptions.snack' },
       { path: 'meals.foodItemId' },
     ]);
 
-    res.json(populated);
+    res.json({
+      plan: populated,
+      usedFallbackCountry: suggestedOptions.usedFallbackCountry,
+      effectiveCountry: suggestedOptions.effectiveCountry,
+    });
   } catch (err) {
     next(err);
   }
@@ -75,6 +89,7 @@ exports.getTodayPlan = async (req, res, next) => {
       { path: 'suggestedOptions.breakfast' },
       { path: 'suggestedOptions.lunch' },
       { path: 'suggestedOptions.dinner' },
+      { path: 'suggestedOptions.snack' },
       { path: 'meals.foodItemId' },
     ]);
 
@@ -84,6 +99,32 @@ exports.getTodayPlan = async (req, res, next) => {
 
     const totals = computeLoggedTotals(plan);
     res.json({ exists: true, plan, totals });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// GET /api/diet/history?days=14 — daily totals-vs-target for a trend view,
+// same idea as the workout/cardio history screens.
+exports.getHistory = async (req, res, next) => {
+  try {
+    const days = Math.min(parseInt(req.query.days, 10) || 14, 60);
+    const since = daysAgoMidnightUTC(days);
+
+    const plans = await MealPlan.find({ userId: req.user._id, date: { $gte: since } })
+      .sort({ date: -1 })
+      .populate('meals.foodItemId')
+      .lean();
+
+    const history = plans.map((plan) => ({
+      date: plan.date,
+      targetCalories: plan.targetCalories,
+      targetMacros: plan.targetMacros,
+      totals: computeLoggedTotals(plan),
+      mealCount: plan.meals.length,
+    }));
+
+    res.json({ history });
   } catch (err) {
     next(err);
   }
@@ -99,6 +140,11 @@ exports.addCustomMeal = async (req, res, next) => {
     }
     if (!foodItemId && !customEntry) {
       return res.status(400).json({ message: 'Either foodItemId or customEntry is required.' });
+    }
+
+    const parsedServings = Number(servings) || 1;
+    if (parsedServings <= 0) {
+      return res.status(400).json({ message: 'servings must be a positive number.' });
     }
 
     const date = todayMidnightUTC();
@@ -122,7 +168,7 @@ exports.addCustomMeal = async (req, res, next) => {
       if (!foodExists) {
         return res.status(404).json({ message: 'FoodItem not found.' });
       }
-      plan.meals.push({ slot, foodItemId, servings, isCustom: false });
+      plan.meals.push({ slot, foodItemId, servings: parsedServings, isCustom: false });
     } else {
       const { name, calories, protein, carbs, fat } = customEntry;
       if (!name || calories == null) {
@@ -131,7 +177,7 @@ exports.addCustomMeal = async (req, res, next) => {
       plan.meals.push({
         slot,
         isCustom: true,
-        servings,
+        servings: parsedServings,
         customEntry: { name, calories, protein: protein || 0, carbs: carbs || 0, fat: fat || 0 },
       });
     }
@@ -141,6 +187,73 @@ exports.addCustomMeal = async (req, res, next) => {
 
     const totals = computeLoggedTotals(plan);
     res.status(201).json({ plan, totals });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// DELETE /api/diet/meal/:mealEntryId — removes a single logged meal from
+// today's plan. There was previously no way to correct a mis-logged entry.
+exports.deleteMeal = async (req, res, next) => {
+  try {
+    const date = todayMidnightUTC();
+    const plan = await MealPlan.findOne({ userId: req.user._id, date });
+
+    if (!plan) {
+      return res.status(404).json({ message: 'No meal plan for today.' });
+    }
+
+    const entry = plan.meals.id(req.params.mealEntryId);
+    if (!entry) {
+      return res.status(404).json({ message: 'Meal entry not found.' });
+    }
+
+    // .pull() rather than the subdocument's own remove/deleteOne — works
+    // consistently across mongoose versions for DocumentArray entries.
+    plan.meals.pull(req.params.mealEntryId);
+    await plan.save();
+    await plan.populate([{ path: 'meals.foodItemId' }]);
+
+    const totals = computeLoggedTotals(plan);
+    res.json({ plan, totals });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// GET /api/diet/food-items/:id — was previously called by the frontend with
+// no matching route at all; MealOptionDetailScreen's fallback fetch silently
+// failed whenever it was opened without the food already in nav params.
+exports.getFoodItem = async (req, res, next) => {
+  try {
+    const food = await mealSuggestionService.getFoodItemById(req.params.id);
+    if (!food) {
+      return res.status(404).json({ message: 'Food item not found.' });
+    }
+    res.json(food);
+  } catch (err) {
+    next(err);
+  }
+};
+
+// GET /api/diet/food-items?q=&country=&slot= — search/browse, backs the
+// autocomplete on CustomMealEntryScreen instead of pure free-text entry.
+exports.searchFoodItems = async (req, res, next) => {
+  try {
+    const { q, country, slot } = req.query;
+    const results = await mealSuggestionService.searchFoodItems({ q, country, slot });
+    res.json({ foodItems: results });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// GET /api/diet/countries — distinct countries actually covered by seed data,
+// backs a picker instead of a free-text field most users mistype.
+exports.getCountries = async (req, res, next) => {
+  try {
+    const countries = await mealSuggestionService.getAvailableCountries();
+    res.json({ countries });
   } catch (err) {
     next(err);
   }

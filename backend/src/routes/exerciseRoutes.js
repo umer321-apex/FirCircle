@@ -1,10 +1,11 @@
 const express = require('express');
 const protect = require('../middleware/authMiddleware');
-const requirePremium = require('../middleware/premiumMiddleware');
-const { getExercises } = require('../controllers/exerciseController');
+const { getExercises, getSuggestedWorkout } = require('../controllers/exerciseController');
 
 const router = express.Router();
 
-router.get('/', protect, requirePremium, getExercises);
+// No premium gate — every user can preview any exercise.
+router.get('/suggestion', protect, getSuggestedWorkout);
+router.get('/', protect, getExercises);
 
 module.exports = router;

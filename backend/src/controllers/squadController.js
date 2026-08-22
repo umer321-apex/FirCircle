@@ -1,22 +1,31 @@
 const Workout = require('../models/Workout');
 const GymCheckIn = require('../models/GymCheckIn');
+const ProgressEntry = require('../models/ProgressEntry');
 const squadMatchService = require('../services/squadMatchService');
 
 const CONSISTENCY_WINDOW_DAYS = 30;
 
 /**
- * Computes workouts completed, check-in consistency %, and a simple
- * progress trend ('up' | 'flat' | 'down') for a single member over the
- * last CONSISTENCY_WINDOW_DAYS days.
+ * Computes workouts completed, total volume, check-in consistency %, a
+ * simple progress trend ('up' | 'flat' | 'down') for check-ins, and a
+ * bodyweight change (kg, signed) over the last CONSISTENCY_WINDOW_DAYS days.
  */
 async function computeMemberStats(memberId) {
   const since = new Date();
   since.setDate(since.getDate() - CONSISTENCY_WINDOW_DAYS);
+  const sinceDateStr = `${since.getFullYear()}-${String(since.getMonth() + 1).padStart(2, '0')}-${String(since.getDate()).padStart(2, '0')}`;
 
-  const [workoutsCompleted, checkIns] = await Promise.all([
-    Workout.countDocuments({ userId: memberId, date: { $gte: since } }),
+  const [workouts, checkIns, progressEntries] = await Promise.all([
+    Workout.find({ userId: memberId, date: { $gte: sinceDateStr } }).select('totalVolume splitCategory').lean(),
     GymCheckIn.find({ userId: memberId, date: { $gte: since } }).sort({ date: 1 }).lean(),
+    ProgressEntry.find({ userId: memberId, date: { $gte: sinceDateStr } })
+      .sort({ date: 1 })
+      .select('date weightKg')
+      .lean(),
   ]);
+
+  const workoutsCompleted = workouts.length;
+  const totalVolume = workouts.reduce((sum, w) => sum + (w.totalVolume || 0), 0);
 
   const consistencyPct = Math.round((checkIns.length / CONSISTENCY_WINDOW_DAYS) * 100);
 
@@ -30,28 +39,37 @@ async function computeMemberStats(memberId) {
   if (recentCount > earlierCount) progressTrend = 'up';
   else if (recentCount < earlierCount) progressTrend = 'down';
 
-  // Leg-day session count, used by the "suggested reason" generator
-  const legDaySessions = await Workout.countDocuments({
-    userId: memberId,
-    date: { $gte: since },
-    splitCategory: { $regex: /leg/i },
-  });
+  // Bodyweight change over the window — signed kg, null if too few logged entries to compare
+  const weightEntries = progressEntries.filter((e) => typeof e.weightKg === 'number');
+  const weightChangeKg =
+    weightEntries.length >= 2
+      ? Math.round((weightEntries[weightEntries.length - 1].weightKg - weightEntries[0].weightKg) * 10) / 10
+      : null;
 
-  return { workoutsCompleted, consistencyPct, progressTrend, legDaySessions };
+  // Leg-day session count, used by the "suggested reason" generator
+  const legDaySessions = workouts.filter((w) => /leg/i.test(w.splitCategory)).length;
+
+  return {
+    workoutsCompleted,
+    totalVolume,
+    consistencyPct,
+    progressTrend,
+    weightChangeKg,
+    legDaySessions,
+  };
 }
 
 /**
  * Builds a plain-English reason the current user is behind the squad
- * average, per FR-5.4. Currently compares leg-day session counts, since
- * that's the most common driver of a consistency gap in this dataset —
- * extendable to other dimensions later.
+ * average, per FR-5.4. Checks a few common drivers of a consistency/volume
+ * gap in priority order, falling back to a generic nudge if none stand out.
  */
-function buildSuggestedReason(currentUserStats, aheadMembersStats) {
+function buildSuggestedReason(currentUserStats, aheadMembersStats, currentUserGoal) {
   if (!aheadMembersStats.length) return null;
 
-  const avgLegDay =
-    aheadMembersStats.reduce((sum, m) => sum + m.legDaySessions, 0) / aheadMembersStats.length;
+  const avg = (key) => aheadMembersStats.reduce((sum, m) => sum + m[key], 0) / aheadMembersStats.length;
 
+  const avgLegDay = avg('legDaySessions');
   if (avgLegDay > currentUserStats.legDaySessions) {
     const diff = currentUserStats.legDaySessions
       ? Math.round(((avgLegDay - currentUserStats.legDaySessions) / currentUserStats.legDaySessions) * 100)
@@ -59,8 +77,32 @@ function buildSuggestedReason(currentUserStats, aheadMembersStats) {
     return `Users ahead of you in your squad logged ${diff}% more leg-day sessions this month.`;
   }
 
-  const avgConsistency =
-    aheadMembersStats.reduce((sum, m) => sum + m.consistencyPct, 0) / aheadMembersStats.length;
+  const avgVolume = avg('totalVolume');
+  if (avgVolume > currentUserStats.totalVolume * 1.15) {
+    const diff = currentUserStats.totalVolume
+      ? Math.round(((avgVolume - currentUserStats.totalVolume) / currentUserStats.totalVolume) * 100)
+      : 100;
+    return `Users ahead of you in your squad lifted about ${diff}% more total volume this month — try adding a set or a little more weight per exercise.`;
+  }
+
+  // Weight-change comparison is goal-directional: for cutting, "more improvement"
+  // means losing more; for bulking, it means gaining more.
+  const weightSamples = aheadMembersStats.filter((m) => m.weightChangeKg !== null);
+  if (weightSamples.length && currentUserStats.weightChangeKg !== null) {
+    const avgWeightChange = weightSamples.reduce((sum, m) => sum + m.weightChangeKg, 0) / weightSamples.length;
+    if (currentUserGoal === 'cutting' && avgWeightChange < currentUserStats.weightChangeKg - 0.3) {
+      return `Users ahead of you in your squad lost about ${Math.abs(
+        (currentUserStats.weightChangeKg - avgWeightChange).toFixed(1)
+      )}kg more this month — check your calorie tracking and cardio consistency.`;
+    }
+    if (currentUserGoal === 'bulking' && avgWeightChange > currentUserStats.weightChangeKg + 0.3) {
+      return `Users ahead of you in your squad gained about ${Math.abs(
+        (avgWeightChange - currentUserStats.weightChangeKg).toFixed(1)
+      )}kg more this month — you may need a slightly larger calorie surplus.`;
+    }
+  }
+
+  const avgConsistency = avg('consistencyPct');
   if (avgConsistency > currentUserStats.consistencyPct) {
     const diff = Math.round(avgConsistency - currentUserStats.consistencyPct);
     return `Users ahead of you in your squad check in about ${diff}% more consistently.`;
@@ -100,6 +142,7 @@ exports.getMySquad = async (req, res, next) => {
       week: squad.cohortWeekStart.getTime() === new Date(0).getTime() ? null : squad.cohortWeekStart,
       goal: squad.goal,
       ageBand: squad.ageBand,
+      weightBand: squad.weightBand || null,
       sex: squad.sex,
     };
 
@@ -125,8 +168,10 @@ exports.getMySquad = async (req, res, next) => {
       isYou: entry.member._id.equals(currentUser._id),
       rank: index + 1,
       workoutsCompleted: entry.stats.workoutsCompleted,
+      totalVolume: entry.stats.totalVolume,
       consistencyPct: entry.stats.consistencyPct,
       progressTrend: entry.stats.progressTrend,
+      weightChangeKg: entry.stats.weightChangeKg,
     }));
 
     const currentEntryIndex = statsByMember.findIndex((e) => e.member._id.equals(currentUser._id));
@@ -134,7 +179,7 @@ exports.getMySquad = async (req, res, next) => {
     const aheadMembers = statsByMember.slice(0, currentEntryIndex).map((e) => e.stats);
 
     const suggestedReason =
-      currentEntryIndex > 0 ? buildSuggestedReason(currentEntry.stats, aheadMembers) : null;
+      currentEntryIndex > 0 ? buildSuggestedReason(currentEntry.stats, aheadMembers, currentUser.goal) : null;
 
     res.json({
       matchedOn,

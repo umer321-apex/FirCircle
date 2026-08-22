@@ -1,17 +1,11 @@
 const User = require('../models/User');
+const { deriveAgeBand, deriveWeightBand } = require('../utils/bands');
 
 const VALID_GOALS = ['cutting', 'bulking', 'maintenance'];
 const VALID_VISIBILITY = ['public', 'private'];
 const VALID_SEX = ['male', 'female', 'other'];
-
-// Pure helper — easy to reuse in squadMatchService.js later if needed
-const deriveAgeBand = (age) => {
-  if (age >= 18 && age <= 24) return '18-24';
-  if (age >= 25 && age <= 34) return '25-34';
-  if (age >= 35 && age <= 44) return '35-44';
-  if (age >= 45) return '45+';
-  return null; // covers under-18 edge case, though age is validated to be >=13
-};
+const VALID_EXPERIENCE_LEVELS = ['beginner', 'intermediate', 'advanced'];
+const VALID_ACTIVITY_LEVELS = ['sedentary', 'light', 'moderate', 'active', 'veryActive'];
 
 const getMe = async (req, res) => {
   try {
@@ -115,7 +109,7 @@ const updateOnboarding = async (req, res) => {
 
 const updateProfile = async (req, res) => {
   try {
-    const { name, visibility, preferredCheckInHour } = req.body;
+    const { name, visibility, preferredCheckInHour, experienceLevel, activityLevel, weightKg } = req.body;
 
     const updateFields = {};
 
@@ -142,8 +136,37 @@ const updateProfile = async (req, res) => {
       updateFields.preferredCheckInHour = hour;
     }
 
+    if (experienceLevel !== undefined) {
+      if (!VALID_EXPERIENCE_LEVELS.includes(experienceLevel)) {
+        return res.status(400).json({
+          message: `experienceLevel must be one of: ${VALID_EXPERIENCE_LEVELS.join(', ')}`,
+        });
+      }
+      updateFields.experienceLevel = experienceLevel;
+    }
+
+    if (activityLevel !== undefined) {
+      if (!VALID_ACTIVITY_LEVELS.includes(activityLevel)) {
+        return res.status(400).json({
+          message: `activityLevel must be one of: ${VALID_ACTIVITY_LEVELS.join(', ')}`,
+        });
+      }
+      updateFields.activityLevel = activityLevel;
+    }
+
+    if (weightKg !== undefined) {
+      const parsedWeight = Number(weightKg);
+      if (isNaN(parsedWeight) || parsedWeight <= 0) {
+        return res.status(400).json({ message: 'weightKg must be a positive number' });
+      }
+      updateFields.weightKg = parsedWeight;
+      // Snapshot the band alongside it — squadMatchService.js groups by this,
+      // not by live weightKg, same convention as ageBand.
+      updateFields.weightBand = deriveWeightBand(parsedWeight);
+    }
+
     if (Object.keys(updateFields).length === 0) {
-      return res.status(400).json({ message: 'Provide at least name or visibility to update' });
+      return res.status(400).json({ message: 'Provide at least one field to update' });
     }
 
     const updatedUser = await User.findByIdAndUpdate(
@@ -162,6 +185,38 @@ const updateProfile = async (req, res) => {
     return res.status(500).json({ message: 'Server error updating profile' });
   }
 };
+const searchUsers = async (req, res) => {
+  try {
+    const { q } = req.query;
 
-module.exports = { getMe, updateOnboarding, updateProfile };
+    if (!q || q.trim().length < 2) {
+      return res.status(200).json({ users: [] });
+    }
+
+    const searchTerm = q.trim();
+
+    // Only surface public users, or private users the requester is already friends with —
+    // respects FR-1.5 visibility rules instead of exposing everyone to a cold search.
+    const users = await User.find({
+      _id: { $ne: req.user._id }, // exclude yourself
+      name: { $regex: searchTerm, $options: 'i' },
+      $or: [
+        { visibility: 'public' },
+        { _id: { $in: req.user.friends || [] } },
+      ],
+    })
+      .select('name email visibility')
+      .limit(20)
+      .lean();
+
+    return res.status(200).json({ users });
+  } catch (error) {
+    console.error(`[userController.searchUsers] Error: ${error.message}`);
+    return res.status(500).json({ message: 'Server error searching users' });
+  }
+};
+
+module.exports = { getMe, updateOnboarding, updateProfile, searchUsers };
+
+
 

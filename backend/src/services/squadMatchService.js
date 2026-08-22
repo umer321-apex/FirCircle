@@ -27,15 +27,17 @@ function addWeeks(date, weeks) {
 
 /**
  * Finds or creates the StartDateSquad document that a user should belong to,
- * following the fallback chain described in FR-5.6:
- *   1. exact week + goal + ageBand [+ sex if provided]
- *   2. widen to adjacent signup week(s) (±1 week), same goal/ageBand[/sex]
- *   3. fall back to ageBand + goal only (drop week + sex requirement)
+ * following a widening fallback chain so a squad always ends up with at
+ * least MIN_SQUAD_SIZE members:
+ *   1. exact week + goal + ageBand + weightBand [+ sex]
+ *   2. widen to adjacent signup week(s) (±1 week), same goal/ageBand/weightBand[/sex]
+ *   2b. same widened window, drop sex
+ *   3. same widened window, also drop weightBand (goal + ageBand [+ sex])
+ *   3b. same widened window, drop both weightBand and sex
+ *   4. final fallback: ageBand + goal only (drop week, sex, weightBand)
  *
- * At each stage we check whether the resulting group would have at least
- * MIN_SQUAD_SIZE members (including the user being placed). If not, we move
- * to the next stage. The final stage (ageBand + goal only) always succeeds,
- * since it has no week or sex constraint.
+ * weightBand requires the user to have weightKg set; if they don't, it's
+ * simply never included as a constraint (same as sex being optional).
  */
 async function findOrCreateSquadForUser(user) {
   if (!user.goal || !user.ageBand) {
@@ -44,70 +46,114 @@ async function findOrCreateSquadForUser(user) {
 
   const weekStart = getWeekStart(user.createdAt || Date.now());
   const sexFilter = user.sex || null;
+  const weightBandFilter = user.weightBand || null;
 
-  // --- Stage 1: exact week + goal + ageBand [+ sex] ---
+  // --- Stage 1: exact week + goal + ageBand + weightBand [+ sex] ---
   let candidate = await tryStage({
     weekStarts: [weekStart],
     goal: user.goal,
     ageBand: user.ageBand,
+    weightBand: weightBandFilter,
     sex: sexFilter,
     excludeUserId: user._id,
   });
   if (candidate.eligible) {
-    return persistMembership(candidate.squadQuery, user._id);
+    return persistMembership(
+      { cohortWeekStart: weekStart, goal: user.goal, ageBand: user.ageBand, weightBand: weightBandFilter, sex: sexFilter },
+      user._id
+    );
   }
 
-  // --- Stage 2: widen to adjacent signup weeks (±1), same goal/ageBand[/sex] ---
+  // --- Stage 2: widen to adjacent signup weeks (±1), same goal/ageBand/weightBand[/sex] ---
   const adjacentWeeks = [addWeeks(weekStart, -1), weekStart, addWeeks(weekStart, 1)];
   candidate = await tryStage({
     weekStarts: adjacentWeeks,
     goal: user.goal,
     ageBand: user.ageBand,
+    weightBand: weightBandFilter,
     sex: sexFilter,
     excludeUserId: user._id,
   });
   if (candidate.eligible) {
-    // Represent the widened cohort under the user's own week for a stable doc identity
     return persistMembership(
-      { cohortWeekStart: weekStart, goal: user.goal, ageBand: user.ageBand, sex: sexFilter },
+      { cohortWeekStart: weekStart, goal: user.goal, ageBand: user.ageBand, weightBand: weightBandFilter, sex: sexFilter },
       user._id,
-      adjacentWeeks // also link membership across the widened week range
+      adjacentWeeks
     );
   }
 
-  // --- Stage 2b: if sex filter was applied, retry the same window without it ---
+  // --- Stage 2b: same window, drop sex (if it was applied) ---
   if (sexFilter) {
     candidate = await tryStage({
       weekStarts: adjacentWeeks,
       goal: user.goal,
       ageBand: user.ageBand,
+      weightBand: weightBandFilter,
       sex: null,
       excludeUserId: user._id,
     });
     if (candidate.eligible) {
       return persistMembership(
-        { cohortWeekStart: weekStart, goal: user.goal, ageBand: user.ageBand, sex: null },
+        { cohortWeekStart: weekStart, goal: user.goal, ageBand: user.ageBand, weightBand: weightBandFilter, sex: null },
         user._id,
         adjacentWeeks
       );
     }
   }
 
-  // --- Stage 3: final fallback — ageBand + goal only (no week, no sex) ---
+  // --- Stage 3: same window, also drop weightBand (if it was applied) ---
+  if (weightBandFilter) {
+    candidate = await tryStage({
+      weekStarts: adjacentWeeks,
+      goal: user.goal,
+      ageBand: user.ageBand,
+      weightBand: null,
+      sex: sexFilter,
+      excludeUserId: user._id,
+    });
+    if (candidate.eligible) {
+      return persistMembership(
+        { cohortWeekStart: weekStart, goal: user.goal, ageBand: user.ageBand, weightBand: null, sex: sexFilter },
+        user._id,
+        adjacentWeeks
+      );
+    }
+
+    // --- Stage 3b: same window, drop both weightBand and sex ---
+    if (sexFilter) {
+      candidate = await tryStage({
+        weekStarts: adjacentWeeks,
+        goal: user.goal,
+        ageBand: user.ageBand,
+        weightBand: null,
+        sex: null,
+        excludeUserId: user._id,
+      });
+      if (candidate.eligible) {
+        return persistMembership(
+          { cohortWeekStart: weekStart, goal: user.goal, ageBand: user.ageBand, weightBand: null, sex: null },
+          user._id,
+          adjacentWeeks
+        );
+      }
+    }
+  }
+
+  // --- Stage 4: final fallback — ageBand + goal only (no week, sex, or weightBand) ---
   // Use a fixed sentinel week (epoch) so all "goal+ageBand only" fallback
   // squads collapse into one stable document per goal/ageBand pair.
   const fallbackWeek = new Date(0);
   return persistMembership(
-    { cohortWeekStart: fallbackWeek, goal: user.goal, ageBand: user.ageBand, sex: null },
+    { cohortWeekStart: fallbackWeek, goal: user.goal, ageBand: user.ageBand, weightBand: null, sex: null },
     user._id
   );
 }
 
 /**
  * Checks how many *other* users would qualify for a given set of candidate
- * weeks + goal + ageBand [+ sex], without writing anything yet.
+ * weeks + goal + ageBand + weightBand [+ sex], without writing anything yet.
  */
-async function tryStage({ weekStarts, goal, ageBand, sex, excludeUserId }) {
+async function tryStage({ weekStarts, goal, ageBand, weightBand, sex, excludeUserId }) {
   const query = {
     goal,
     ageBand,
@@ -129,6 +175,9 @@ async function tryStage({ weekStarts, goal, ageBand, sex, excludeUserId }) {
   if (sex) {
     query.sex = sex;
   }
+  if (weightBand) {
+    query.weightBand = weightBand;
+  }
 
   const matchCount = await User.countDocuments(query);
   // +1 to account for the user being placed
@@ -140,8 +189,8 @@ async function tryStage({ weekStarts, goal, ageBand, sex, excludeUserId }) {
 /**
  * Upserts the StartDateSquad document for the given criteria and adds the
  * user to memberIds. Also backfills any other users in the widened week
- * range who match the same goal/ageBand[/sex] but aren't in a squad yet
- * for this stage — keeps the group actually populated, not just created.
+ * range who match the same goal/ageBand/weightBand[/sex] but aren't in a
+ * squad yet for this stage — keeps the group actually populated, not just created.
  */
 async function persistMembership(squadQuery, userId, widenedWeeks = null) {
   const squad = await StartDateSquad.findOneAndUpdate(
@@ -151,7 +200,7 @@ async function persistMembership(squadQuery, userId, widenedWeeks = null) {
   );
 
   // If this was a widened-week match, pull in other eligible users from the
-  // adjacent weeks who aren't members of any squad yet for this goal/ageBand/sex.
+  // adjacent weeks who aren't members of any squad yet for this goal/ageBand/weightBand/sex.
   if (widenedWeeks) {
     const earliest = widenedWeeks.reduce((a, b) => (a < b ? a : b));
     const latestEnd = addWeeks(widenedWeeks.reduce((a, b) => (a > b ? a : b)), 1);
@@ -163,6 +212,7 @@ async function persistMembership(squadQuery, userId, widenedWeeks = null) {
       _id: { $ne: userId, $nin: squad.memberIds },
     };
     if (squadQuery.sex) otherQuery.sex = squadQuery.sex;
+    if (squadQuery.weightBand) otherQuery.weightBand = squadQuery.weightBand;
 
     const others = await User.find(otherQuery).select('_id').lean();
     if (others.length) {
@@ -188,7 +238,7 @@ async function getSquadForUser(userId) {
     squad = await findOrCreateSquadForUser(user);
   }
 
-  await squad.populate('memberIds', 'name goal ageBand sex visibility createdAt');
+  await squad.populate('memberIds', 'name goal ageBand weightBand sex visibility createdAt');
   return squad;
 }
 

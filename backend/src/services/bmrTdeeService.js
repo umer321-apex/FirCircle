@@ -13,12 +13,19 @@ function calculateBMR({ weightKg, heightCm, age, sex }) {
   return base - 78; // neutral fallback when sex is not provided
 }
 
-// Standard activity multipliers — MVP uses a single "moderately active" default
-// since the app doesn't yet collect a dedicated activity-level input.
-const ACTIVITY_MULTIPLIER = 1.55; // moderate exercise 3-5 days/week
+// Standard activity multipliers, keyed by User.activityLevel.
+const ACTIVITY_MULTIPLIERS = {
+  sedentary: 1.2, // little or no exercise
+  light: 1.375, // light exercise 1-3 days/week
+  moderate: 1.55, // moderate exercise 3-5 days/week
+  active: 1.725, // hard exercise 6-7 days/week
+  veryActive: 1.9, // very hard exercise + physical job
+};
+const DEFAULT_ACTIVITY_LEVEL = 'moderate';
 
-function calculateTDEE(bmr, activityMultiplier = ACTIVITY_MULTIPLIER) {
-  return bmr * activityMultiplier;
+function calculateTDEE(bmr, activityLevel = DEFAULT_ACTIVITY_LEVEL) {
+  const multiplier = ACTIVITY_MULTIPLIERS[activityLevel] || ACTIVITY_MULTIPLIERS[DEFAULT_ACTIVITY_LEVEL];
+  return bmr * multiplier;
 }
 
 /**
@@ -70,9 +77,9 @@ function calculateMacros(targetCalories, goal, weightKg) {
 /**
  * Full pipeline: user profile -> { targetCalories, targetMacros }
  */
-function generateTargets({ weightKg, heightCm, age, sex, goal }) {
+function generateTargets({ weightKg, heightCm, age, sex, goal, activityLevel }) {
   const bmr = calculateBMR({ weightKg, heightCm, age, sex });
-  const tdee = calculateTDEE(bmr);
+  const tdee = calculateTDEE(bmr, activityLevel);
   const targetCalories = adjustForGoal(tdee, goal);
   const targetMacros = calculateMacros(targetCalories, goal, weightKg);
   return { targetCalories, targetMacros };
@@ -84,4 +91,5 @@ module.exports = {
   adjustForGoal,
   calculateMacros,
   generateTargets,
+  ACTIVITY_MULTIPLIERS,
 };

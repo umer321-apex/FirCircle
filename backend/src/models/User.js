@@ -23,6 +23,19 @@ const userSchema = new mongoose.Schema(
       type: String,
       enum: ['cutting', 'bulking', 'maintenance'],
     },
+    // Drives cardio (and future strength) suggestion logic — duration/intensity scale with this.
+    experienceLevel: {
+      type: String,
+      enum: ['beginner', 'intermediate', 'advanced'],
+      default: 'beginner',
+    },
+    // Drives the TDEE activity multiplier in bmrTdeeService.js — previously hardcoded
+    // to "moderate" for every user regardless of actual activity.
+    activityLevel: {
+      type: String,
+      enum: ['sedentary', 'light', 'moderate', 'active', 'veryActive'],
+      default: 'moderate',
+    },
     homeGym: {
       name: String,
       address: String,
@@ -52,6 +65,13 @@ const userSchema = new mongoose.Schema(
       enum: ['male', 'female', 'other'],
     },
     weightKg: Number,
+    // Snapshot band derived from weightKg whenever it's set/updated — same
+    // "computed once, not live-recalculated" convention as ageBand. Used by
+    // squadMatchService.js to group users of similar bodyweight.
+    weightBand: {
+      type: String,
+      enum: ['<60kg', '60-69kg', '70-79kg', '80-89kg', '90-99kg', '100kg+'],
+    },
     heightCm: Number,
     healthConditions: {
       type: [String],
@@ -108,5 +128,7 @@ const userSchema = new mongoose.Schema(
 
 // Compound index used heavily by squadMatchService.js later (week + goal + ageBand)
 userSchema.index({ goal: 1, ageBand: 1, createdAt: 1 });
+// Supports the weight-band matching stage in squadMatchService.js
+userSchema.index({ goal: 1, ageBand: 1, weightBand: 1 });
 
 module.exports = mongoose.model('User', userSchema);

@@ -21,7 +21,16 @@ const exerciseSchema = new mongoose.Schema(
     splitCategory: {
       type: String,
       required: true,
-      enum: ['Chest Day', 'Back Day', 'Leg Day', 'Shoulder Day', 'Arm Day'],
+      enum: [
+        'Chest Day',
+        'Back Day',
+        'Leg Day',
+        'Shoulder Day',
+        'Arm Day',
+        'Push Day',
+        'Pull Day',
+        'Legs Day',
+      ],
       index: true,
     },
     primaryMuscle: {
@@ -32,6 +41,10 @@ const exerciseSchema = new mongoose.Schema(
       cutting: { type: variantSchema, required: true },
       bulking: { type: variantSchema, required: true },
     },
+    // External URLs only — no upload pipeline. Optional so existing/seed rows
+    // without media don't break; frontend hides the media block when empty.
+    imageUrl: { type: String, trim: true, default: '' },
+    videoUrl: { type: String, trim: true, default: '' },
   },
   { timestamps: true }
 );
